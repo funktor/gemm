@@ -5,6 +5,7 @@
 #include <iostream>
 #include <math.h>
 #include <assert.h>
+#include <chrono>
 #include <omp.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
