@@ -109,7 +109,8 @@ bool compare_matrices(const float *x, const float *y, const long n) {
     return true;
 }
 
-void print_arr(const float *x, const long n) {
+template <typename T>
+void print_arr(const T *x, const long n) {
     for (auto i = 0; i < n; i++) {
         std::cout << x[i] << ", ";
     }
