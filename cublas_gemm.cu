@@ -187,6 +187,9 @@ int main(){
     convertFp32ToFp16 <<< (k * n + 255) / 256, 256 >>> (b_fp16, b_fp32, k * n);
     cudaDeviceSynchronize();
 
+    print_arr(a_fp16, 10);
+    print_arr(b_fp16, 10);
+
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_fp16_cublas(a_fp16, b_fp16, d_gpu_fp32, 1.0, 0.0, m, n, k);
     cudaErrCheck(cudaEventRecord(stopcublas));
