@@ -90,7 +90,6 @@ void gemm_fp32_cublas(
 }
 
 bool compare_matrices(const float *x, const float *y, const long n) {
-    int errors = 0;
     for (int i = 0; i < n; i++) {
         float v1 = x[i];
         float v2 = y[i];
