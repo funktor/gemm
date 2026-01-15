@@ -109,8 +109,7 @@ bool compare_matrices(const float *x, const float *y, const long n) {
     return true;
 }
 
-template <typename T>
-void print_arr(const T *x, const long n) {
+void print_arr(const float *x, const long n) {
     for (auto i = 0; i < n; i++) {
         printf("%f, ", x[i]);
     }
@@ -126,9 +125,9 @@ void convertFp32ToFp16 (half *out, const float *in, const long n) {
  }
 
 int main(){
-    int m = 1024;
-    int n = 1024;
-    int k = 1024;
+    int m = 32;
+    int n = 32;
+    int k = 32;
 
     float *a_fp32;
     float *b_fp32;
@@ -187,9 +186,6 @@ int main(){
     convertFp32ToFp16 <<< (m * k + 255) / 256, 256 >>> (a_fp16, a_fp32, m * k);
     convertFp32ToFp16 <<< (k * n + 255) / 256, 256 >>> (b_fp16, b_fp32, k * n);
     cudaDeviceSynchronize();
-
-    print_arr(a_fp16, 10);
-    print_arr(b_fp16, 10);
 
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_fp16_cublas(a_fp16, b_fp16, d_gpu_fp32, 1.0, 0.0, m, n, k);
