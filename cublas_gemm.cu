@@ -90,16 +90,26 @@ void gemm_fp32_cublas(
 }
 
 bool compare_matrices(const float *x, const float *y, const long n) {
-    for (int i = 0; i < n; i++) {
+    for (auto i = 0; i < n; i++) {
         float v1 = x[i];
         float v2 = y[i];
         float diff  = fabs(v1 - v2);
         float relative_err = diff / v2;
         float eps = 1e-4;
-        if ((relative_err >= eps)) return false;
+        if ((relative_err >= eps)) {
+            std::cout << v1 << " " << v2 << std::endl;
+            return false;
+        }
     }
 
     return true;
+}
+
+void print_arr(const float *x, const long n) {
+    for (auto i = 0; i < n; i++) {
+        std::cout << x[i] << ", ";
+    }
+    std::cout << std::endl;
 }
 
 __global__ 
@@ -159,6 +169,7 @@ int main(){
     cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
     std::cout << "GPU CUBLAS FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32, m*n) << std::endl;
+    print_arr(c_gpu_fp32, 10);
 
 
     half *a_fp16;
@@ -181,6 +192,7 @@ int main(){
     cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
     std::cout << "GPU CUBLAS FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, d_gpu_fp32, m*n) << std::endl;
+    print_arr(d_gpu_fp32, 10);
 
     cudaErrCheck(cudaEventDestroy(startcublas));             
     cudaErrCheck(cudaEventDestroy(stopcublas));
