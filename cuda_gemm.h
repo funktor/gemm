@@ -17,6 +17,8 @@ void gemm_cpu(
     const float *a, 
     const float *b, 
     float *c, 
+    const float alpha,
+    const float beta,
     const int m, 
     const int n, 
     const int k

@@ -34,6 +34,8 @@ void gemm_fp16_cublas(
     const int k
 ) {
 
+    for (auto i = 0; i < m*n; i++) c_fp32[i] = 0.0;
+
     cublasHandle_t handle;
     cublasErrCheck(cublasCreate(&handle));
     // Use tensor cores
@@ -66,6 +68,8 @@ void gemm_fp32_cublas(
     const int n, 
     const int k
 ) {
+
+    for (auto i = 0; i < m*n; i++) c_fp32[i] = 0.0;
 
     cublasHandle_t handle;
     cublasErrCheck(cublasCreate(&handle));
@@ -149,7 +153,7 @@ int main(){
 
 
     auto start = std::chrono::high_resolution_clock::now();
-    gemm_cpu(a_fp32, b_fp32, c_cpu_fp32, m, n, k);
+    gemm_cpu(a_fp32, b_fp32, c_cpu_fp32, 1.0, 0.0, m, n, k);
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << "CPU GEMM Duration = " << duration.count() << " ms" << std::endl;
@@ -158,7 +162,6 @@ int main(){
 
     float *c_gpu_fp32;
     cudaErrCheck(cudaMallocManaged(&c_gpu_fp32, m * n * sizeof(float)));
-    for (int i = 0; i < m*n; i++) c_gpu_fp32[i] = 0.0;
 
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_fp32_cublas(a_fp32, b_fp32, c_gpu_fp32, 1.0, 0.0, m, n, k);
@@ -179,10 +182,10 @@ int main(){
     cudaErrCheck(cudaMallocManaged(&a_fp16, m * k * sizeof(half)));
     cudaErrCheck(cudaMallocManaged(&b_fp16, k * n * sizeof(half)));
     cudaErrCheck(cudaMallocManaged(&d_gpu_fp32, m * n * sizeof(float)));
-    for (int i = 0; i < m*n; i++) d_gpu_fp32[i] = 0.0;
 
     convertFp32ToFp16 <<< (m * k + 255) / 256, 256 >>> (a_fp16, a_fp32, m * k);
     convertFp32ToFp16 <<< (k * n + 255) / 256, 256 >>> (b_fp16, b_fp32, k * n);
+    cudaDeviceSynchronize();
 
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_fp16_cublas(a_fp16, b_fp16, d_gpu_fp32, 1.0, 0.0, m, n, k);
