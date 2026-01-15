@@ -78,8 +78,8 @@ void gemm_fp32_cublas(
             CUBLAS_OP_N, CUBLAS_OP_N,
             m, n, k,
             &alpha,
-            a_fp16, CUDA_R_32F, m,
-            b_fp16, CUDA_R_32F, k,
+            a_fp32, CUDA_R_32F, m,
+            b_fp32, CUDA_R_32F, k,
             &beta,
             c_fp32, CUDA_R_32F, m,
             CUDA_R_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP
@@ -91,7 +91,7 @@ void gemm_fp32_cublas(
 
 bool compare_matrices(const float *x, const float *y, const long n) {
     int errors = 0;
-    for (auto i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++) {
         float v1 = x[i];
         float v2 = y[i];
         float diff  = fabs(v1 - v2);
@@ -149,9 +149,10 @@ int main(){
 
     float *c_gpu_fp32;
     cudaErrCheck(cudaMallocManaged(&c_gpu_fp32, m * n * sizeof(float)));
+    for (int i = 0; i < m*n; i++) c_gpu_fp32[i] = 0.0;
 
     cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_fp32_cublas(a_fp32, b_fp32, c_gpu_fp32, m, n, k);
+    gemm_fp32_cublas(a_fp32, b_fp32, c_gpu_fp32, 1.0, 0.0, m, n, k);
     cudaErrCheck(cudaEventRecord(stopcublas));
     cudaErrCheck(cudaEventSynchronize(stopcublas));
 
@@ -168,12 +169,13 @@ int main(){
     cudaErrCheck(cudaMallocManaged(&a_fp16, m * k * sizeof(half)));
     cudaErrCheck(cudaMallocManaged(&b_fp16, k * n * sizeof(half)));
     cudaErrCheck(cudaMallocManaged(&d_gpu_fp32, m * n * sizeof(float)));
+    for (int i = 0; i < m*n; i++) d_gpu_fp32[i] = 0.0;
 
     convertFp32ToFp16 <<< (m * k + 255) / 256, 256 >>> (a_fp16, a_fp32, m * k);
     convertFp32ToFp16 <<< (k * n + 255) / 256, 256 >>> (b_fp16, b_fp32, k * n);
 
     cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_fp16_cublas(a_fp16, b_fp16, d_gpu_fp32, m, n, k);
+    gemm_fp16_cublas(a_fp16, b_fp16, d_gpu_fp32, 1.0, 0.0, m, n, k);
     cudaErrCheck(cudaEventRecord(stopcublas));
     cudaErrCheck(cudaEventSynchronize(stopcublas));
 
