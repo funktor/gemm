@@ -45,6 +45,6 @@ void gemm_fp32_cublas(
 );
 
 bool compare_matrices(const float *x, const float *y, const long n);
-void convertFp32ToFp16 (half *out, const float *in, const long n);
+__global__ void convertFp32ToFp16 (half *out, const float *in, const long n);
 
 #endif
