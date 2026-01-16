@@ -150,8 +150,6 @@ int main(){
     cudaErrCheck(cudaMallocManaged(&b_fp32, k * n * sizeof(float)));
     cudaErrCheck(cudaMallocManaged(&c_cpu_fp32, m * n * sizeof(float)));
 
-    for (auto i = 0; i < m*n; i++) c_cpu_fp32[i] = 0.0;
-
     float cublasTime;
     cudaEvent_t startcublas;
     cudaEvent_t stopcublas;
@@ -166,7 +164,7 @@ int main(){
     curandErrCheck(curandGenerateUniform(gen, a_fp32, m * k));
     curandErrCheck(curandGenerateUniform(gen, b_fp32, k * n));
 
-
+    for (auto i = 0; i < m*n; i++) c_cpu_fp32[i] = 0.0;
 
     auto start = std::chrono::high_resolution_clock::now();
     gemm_cpu(a_fp32, b_fp32, c_cpu_fp32, 1.0, 0.0, m, n, k);
