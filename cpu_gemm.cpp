@@ -12,15 +12,13 @@ void gemm_cpu(
     const int k
 ) 
 {
-    for (auto i = 0; i < m*n; i++) c[i] *= beta;
-
     omp_set_num_threads(8);
     #pragma omp parallel for shared(a, b, c)
     for(auto i = 0; i < m; i++) {
         for (auto j = 0; j < n; j++) {
             float r = 0.0f;
-            for (auto q = 0; q < k; q++) r += alpha*a[i*k+q]*b[q*n+j];
-            c[i*n+j] = r;
+            for (auto q = 0; q < k; q++) r += a[i*k+q]*b[q*n+j];
+            c[i*n+j] = alpha*r + beta*c[i*n+j];
         }
     }
 }

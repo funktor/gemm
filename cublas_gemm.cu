@@ -67,8 +67,6 @@ void gemm_fp32_cublas(
 ) {
     cublasHandle_t handle;
     cublasErrCheck(cublasCreate(&handle));
-    // Use tensor cores
-    // cublasErrCheck(cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH));
 
     cublasErrCheck(
         cublasSgemm(
@@ -85,6 +83,28 @@ void gemm_fp32_cublas(
 
     cublasDestroy(handle);
 }
+
+__global__
+void gemm_fp32_cuda(
+    const float *a_fp32, 
+    const float *b_fp32, 
+    float *c_fp32, 
+    const float alpha, 
+    const float beta, 
+    const int m, 
+    const int n, 
+    const int k
+) {
+    int row = blockIdx.y*blockDim.y + threadIdx.y;
+    int col = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (row < m && col < n) {
+        float res = 0.0f;
+        for (int i = 0; i < k; i++) res += a[row*k+i]*b[i*n+col];
+        c[row*n+col] = alpha*res + beta*c[row*n+col];
+    }
+}
+
 
 bool compare_matrices(const float *x, const float *y, const long n) {
     for (auto i = 0; i < n; i++) {
@@ -152,6 +172,28 @@ int main(){
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << "CPU GEMM Duration = " << duration.count() << " ms" << std::endl;
+
+
+
+    float *c_gpu_fp32_ccores;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_ccores, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_ccores[i] = 0.0f;
+
+    dim3 bd(32, 32, 1);
+    dim3 gd((n+31)/32, (m+31)/32, 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_fp32_cuda<<<gd, bd>>>(a_fp32, b_fp32, c_gpu_fp32_ccores, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+
+    float cublasTime;
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU CUDA FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_ccores, m*n) << std::endl;
+
 
 
 
