@@ -52,10 +52,10 @@ void gemm_fp16_cublas(
             CUBLAS_OP_N, CUBLAS_OP_N,
             m, n, k,
             &alpha,
-            a_fp16, CUDA_R_16F, m,
-            b_fp16, CUDA_R_16F, k,
+            b_fp16, CUDA_R_16F, n,
+            a_fp16, CUDA_R_16F, k,
             &beta,
-            c_fp32, CUDA_R_32F, m,
+            c_fp32, CUDA_R_32F, n,
             CUDA_R_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP
         )
     );
@@ -75,6 +75,7 @@ void gemm_fp32_cublas(
 ) {
     cublasHandle_t handle;
     cublasErrCheck(cublasCreate(&handle));
+    cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH);
 
     cublasErrCheck(
         cublasSgemm(
@@ -146,9 +147,9 @@ void convertFp32ToFp16 (half *out, const float *in, const long n) {
  }
 
 int main(){
-    int m = 1024;
-    int n = 1024;
-    int k = 1024;
+    int m = 2048;
+    int n = 2048;
+    int k = 128;
 
     float *a_fp32;
     float *b_fp32;
