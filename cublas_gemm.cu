@@ -82,10 +82,10 @@ void gemm_fp32_cublas(
             CUBLAS_OP_N, CUBLAS_OP_N,
             m, n, k,
             &alpha,
-            a_fp32, m,
-            b_fp32, k,
+            b_fp32, n,
+            a_fp32, k,
             &beta,
-            c_fp32, m
+            c_fp32, n
         )
     );
 
