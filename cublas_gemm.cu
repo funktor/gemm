@@ -144,13 +144,13 @@ void gemm_fp32_cuda_tiled(
     for (int r = 0; r < COARSE_FACTOR; r++) Pval[r] = 0.0f;
 
     for (int ph = 0; ph < k; ph += TILE_WIDTH) {
-        if (row < m && (ph + tx) < k) Mds[ty*TILE_WIDTH+tx] = a[row*k + ph + tx];
+        if (row < m && (ph + tx) < k) Mds[ty*TILE_WIDTH+tx] = a_fp32[row*k + ph + tx];
         else Mds[ty*TILE_WIDTH+tx] = 0.0f;
 
         for (int r = 0; r < COARSE_FACTOR; r++) {
             int col = col_start + r*TILE_WIDTH;
 
-            if ((ph + ty) < n && col < k) Nds[ty*TILE_WIDTH+tx] = b[col*n + ph + ty];
+            if ((ph + ty) < n && col < k) Nds[ty*TILE_WIDTH+tx] = b_fp32[col*n + ph + ty];
             else Nds[ty*TILE_WIDTH+tx] = 0.0f;
             __syncthreads();
 
@@ -161,7 +161,7 @@ void gemm_fp32_cuda_tiled(
 
     for (int r = 0; r < COARSE_FACTOR; r++) {
         int col = col_start + r*TILE_WIDTH;
-        if (row < m && col < n) c[row*p+col] = Pval[r];
+        if (row < m && col < n) c_fp32[row*n+col] = Pval[r];
     }
 }
 
