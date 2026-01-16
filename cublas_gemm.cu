@@ -32,7 +32,6 @@ void generate_data(float *x, const long n) {
 }
 
 void gemm_fp16_cublas(
-    cublasHandle_t &handle,
     const __half *a_fp16, 
     const __half *b_fp16, 
     float *c_fp32, 
@@ -42,6 +41,11 @@ void gemm_fp16_cublas(
     const int n, 
     const int k
 ) {
+    cublasHandle_t handle;
+    cublasErrCheck(cublasCreate(&handle));
+    // Use tensor cores
+    cublasErrCheck(cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH));
+
     cublasErrCheck(
         cublasGemmEx(
             handle, 
@@ -55,10 +59,11 @@ void gemm_fp16_cublas(
             CUDA_R_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP
         )
     );
+
+    cublasDestroy(handle);
 }
 
 void gemm_fp32_cublas(
-    cublasHandle_t &handle,
     const float *a_fp32, 
     const float *b_fp32, 
     float *c_fp32, 
@@ -68,6 +73,9 @@ void gemm_fp32_cublas(
     const int n, 
     const int k
 ) {
+    cublasHandle_t handle;
+    cublasErrCheck(cublasCreate(&handle));
+
     cublasErrCheck(
         cublasSgemm(
             handle, 
@@ -80,6 +88,8 @@ void gemm_fp32_cublas(
             c_fp32, m
         )
     );
+
+    cublasDestroy(handle);
 }
 
 __global__
@@ -189,9 +199,7 @@ int main(){
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_ccores, m*n) << std::endl;
 
 
-    cublasHandle_t handle;
-    cublasErrCheck(cublasCreate(&handle));
-    cublasErrCheck(cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH));
+
 
     float *c_gpu_fp32;
     cudaErrCheck(cudaMallocManaged(&c_gpu_fp32, m * n * sizeof(float)));
@@ -199,7 +207,7 @@ int main(){
     for (auto i = 0; i < m*n; i++) c_gpu_fp32[i] = 0.0f;
 
     cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_fp32_cublas(handle, a_fp32, b_fp32, c_gpu_fp32, 1.0, 0.0, m, n, k);
+    gemm_fp32_cublas(a_fp32, b_fp32, c_gpu_fp32, 1.0, 0.0, m, n, k);
     cudaErrCheck(cudaEventRecord(stopcublas));
     cudaErrCheck(cudaEventSynchronize(stopcublas));
     cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
@@ -222,9 +230,10 @@ int main(){
     cudaDeviceSynchronize();
 
     cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_fp16_cublas(handle, a_fp16, b_fp16, d_gpu_fp32, 1.0, 0.0, m, n, k);
+    gemm_fp16_cublas(a_fp16, b_fp16, d_gpu_fp32, 1.0, 0.0, m, n, k);
     cudaErrCheck(cudaEventRecord(stopcublas));
     cudaErrCheck(cudaEventSynchronize(stopcublas));
+
     cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
     std::cout << "GPU CUBLAS FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, d_gpu_fp32, m*n) << std::endl;
@@ -232,8 +241,6 @@ int main(){
     cudaErrCheck(cudaEventDestroy(startcublas));             
     cudaErrCheck(cudaEventDestroy(stopcublas));
     
-    cublasDestroy(handle);
-
     cudaErrCheck(cudaFree(a_fp32));
     cudaErrCheck(cudaFree(b_fp32));
     cudaErrCheck(cudaFree(c_cpu_fp32));
