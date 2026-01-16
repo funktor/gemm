@@ -3,6 +3,7 @@ using namespace nvcuda;
 
 #define TILE_WIDTH 32
 #define COARSE_FACTOR 4
+#define COARSE_FACTOR_2D 2
 
 // Define some error checking macros.
 #define cudaErrCheck(stat) { cudaErrCheck_((stat), __FILE__, __LINE__); }
@@ -165,6 +166,57 @@ void gemm_fp32_cuda_tiled(
 }
 
 
+__global__
+void gemm_fp32_cuda_tiled_2D(
+    const float *a_fp32, 
+    const float *b_fp32, 
+    float *c_fp32, 
+    const float alpha, 
+    const float beta, 
+    const int m, 
+    const int n, 
+    const int k
+) {
+    __shared__ float Mds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ float Nds[TILE_WIDTH*TILE_WIDTH];
+
+    int bx = blockIdx.x;
+    int by = blockIdx.y;
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+
+    int row_start = by*TILE_WIDTH*COARSE_FACTOR_2D + ty;
+    int col_start = bx*TILE_WIDTH*COARSE_FACTOR_2D + tx;
+
+    float Pval[COARSE_FACTOR_2D*COARSE_FACTOR_2D];
+    for (int r = 0; r < COARSE_FACTOR_2D*COARSE_FACTOR_2D; r++) Pval[r] = 0.0f;
+
+    for (int ph = 0; ph < k; ph += TILE_WIDTH) {
+        int r = 0;
+        for (int row = row_start; row < m; row += TILE_WIDTH) {
+            if (row < m && ph + tx < k) Mds[ty*TILE_WIDTH+tx] = a_fp32[row*k + ph + tx];
+            else Mds[ty*TILE_WIDTH+tx] = 0.0f;
+
+            for (int col = col_start; col < n; col += TILE_WIDTH) {
+                if (ph + ty < k && col < n) Nds[ty*TILE_WIDTH+tx] = b_fp32[(ph + ty)*n + col];
+                else Nds[ty*TILE_WIDTH+tx] = 0.0f;
+                __syncthreads();
+
+                for (int i = 0; i < TILE_WIDTH; i++) Pval[r++] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx];
+                __syncthreads();
+            }
+        }
+    }
+
+    int r = 0;
+    for (int row = row_start; row < m; row += TILE_WIDTH) {
+        for (int col = col_start; col < n; col += TILE_WIDTH) {
+            if (row < m && col < n) c_fp32[row*n+col] = Pval[r++];
+        }
+    }
+}
+
+
 bool compare_matrices(const float *x, const float *y, const long n) {
     for (auto i = 0; i < n; i++) {
         float v1 = x[i];
@@ -267,6 +319,25 @@ int main(){
     cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
     std::cout << "GPU CUDA TILED FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled, m*n) << std::endl;
+
+
+
+    float *c_gpu_fp32_tiled_2d;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled_2d, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d[i] = 0.0f;
+
+    dim3 bd2(32, 32, 1);
+    dim3 gd2((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_fp32_cuda_tiled_2D<<<gd2, bd2>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU CUDA TILED 2D FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d, m*n) << std::endl;
 
 
 
