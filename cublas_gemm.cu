@@ -2,8 +2,8 @@
 using namespace nvcuda;
 
 #define TILE_WIDTH 32
-#define COARSE_FACTOR 4
-#define COARSE_FACTOR_2D 2
+#define COARSE_FACTOR 8
+#define COARSE_FACTOR_2D 4
 
 // Define some error checking macros.
 #define cudaErrCheck(stat) { cudaErrCheck_((stat), __FILE__, __LINE__); }
