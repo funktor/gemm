@@ -173,26 +173,25 @@ int main(){
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << "CPU GEMM Duration = " << duration.count() << " ms" << std::endl;
-    print_arr(c_cpu_fp32, 10);
 
 
 
-    float *c_gpu_fp32_ccores;
-    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_ccores, m * n * sizeof(float)));
+    // float *c_gpu_fp32_ccores;
+    // cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_ccores, m * n * sizeof(float)));
 
-    for (auto i = 0; i < m*n; i++) c_gpu_fp32_ccores[i] = 0.0f;
+    // for (auto i = 0; i < m*n; i++) c_gpu_fp32_ccores[i] = 0.0f;
 
-    dim3 bd(32, 32, 1);
-    dim3 gd((n+31)/32, (m+31)/32, 1);
+    // dim3 bd(32, 32, 1);
+    // dim3 gd((n+31)/32, (m+31)/32, 1);
 
-    cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_fp32_cuda<<<gd, bd>>>(a_fp32, b_fp32, c_gpu_fp32_ccores, 1.0, 0.0, m, n, k);
-    cudaDeviceSynchronize();
-    cudaErrCheck(cudaEventRecord(stopcublas));
-    cudaErrCheck(cudaEventSynchronize(stopcublas));
-    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    std::cout << "GPU CUDA FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_ccores, m*n) << std::endl;
+    // cudaErrCheck(cudaEventRecord(startcublas));
+    // gemm_fp32_cuda<<<gd, bd>>>(a_fp32, b_fp32, c_gpu_fp32_ccores, 1.0, 0.0, m, n, k);
+    // cudaDeviceSynchronize();
+    // cudaErrCheck(cudaEventRecord(stopcublas));
+    // cudaErrCheck(cudaEventSynchronize(stopcublas));
+    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    // std::cout << "GPU CUDA FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_ccores, m*n) << std::endl;
 
 
 
@@ -210,6 +209,7 @@ int main(){
     std::cout << "GPU CUBLAS FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32, m*n) << std::endl;
 
+    
     half *a_fp16;
     half *b_fp16;
     float *d_gpu_fp32;
