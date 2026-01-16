@@ -142,7 +142,7 @@ void gemm_fp32_cuda_tiled(
     float Pval[COARSE_FACTOR];
     for (int r = 0; r < COARSE_FACTOR; r++) Pval[r] = 0.0f;
 
-    for (int ph = 0; ph < ceil(k/float(TILE_WIDTH)); ph++) {
+    for (int ph = 0; ph < k; ph += TILE_WIDTH) {
         if (row < m && (ph + tx) < k) Mds[ty*TILE_WIDTH+tx] = a_fp32[row*k + ph + tx];
         else Mds[ty*TILE_WIDTH+tx] = 0.0f;
 
