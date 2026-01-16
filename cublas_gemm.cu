@@ -257,11 +257,11 @@ int main(){
 
     for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled[i] = 0.0f;
 
-    dim3 bd(32, 32, 1);
-    dim3 gd((n+32*COARSE_FACTOR-1)/(32*COARSE_FACTOR), (m+31)/32, 1);
+    dim3 bd1(32, 32, 1);
+    dim3 gd1((n+32*COARSE_FACTOR-1)/(32*COARSE_FACTOR), (m+31)/32, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_fp32_cuda_tiled<<<gd, bd>>>(a_fp32, b_fp32, c_gpu_fp32_tiled, 1.0, 0.0, m, n, k);
+    gemm_fp32_cuda_tiled<<<gd1, bd1>>>(a_fp32, b_fp32, c_gpu_fp32_tiled, 1.0, 0.0, m, n, k);
     cudaDeviceSynchronize();
     cudaErrCheck(cudaEventRecord(stopcublas));
     cudaErrCheck(cudaEventSynchronize(stopcublas));
