@@ -150,7 +150,7 @@ int main(){
     cudaErrCheck(cudaMallocManaged(&b_fp32, k * n * sizeof(float)));
     cudaErrCheck(cudaMallocManaged(&c_cpu_fp32, m * n * sizeof(float)));
 
-    // for (auto i = 0; i < m*n; i++) c_cpu_fp32[i] = 0.0f;
+    for (auto i = 0; i < m*n; i++) c_cpu_fp32[i] = 0.0;
 
     float cublasTime;
     cudaEvent_t startcublas;
