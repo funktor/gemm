@@ -149,7 +149,7 @@ void gemm_fp32_cuda_tiled(
         for (int r = 0; r < COARSE_FACTOR; r++) {
             int col = col_start + r*TILE_WIDTH;
 
-            if ((ph + ty) < n && col < k) Nds[ty*TILE_WIDTH+tx] = b_fp32[col*n + ph + ty];
+            if ((ph + ty) < k && col < n) Nds[ty*TILE_WIDTH+tx] = b_fp32[(ph + ty)*n + col];
             else Nds[ty*TILE_WIDTH+tx] = 0.0f;
             __syncthreads();
 
