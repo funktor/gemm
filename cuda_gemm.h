@@ -13,6 +13,8 @@
 #include <cublas_v2.h>
 #include <mma.h>
 
+void generate_data(float *x, const long n);
+
 void gemm_cpu(
     const float *a, 
     const float *b, 

@@ -23,6 +23,14 @@ void curandErrCheck_(curandStatus_t stat, const char *file, int line) {
    }
 }
 
+void generate_data(float *x, const long n) {
+    static std::random_device dev;
+    static std::mt19937 rng(dev());
+
+    std::uniform_real_distribution<float> dist(0.0, 1.0);
+    for (auto i = 0; i < n; i++) x[i] = dist(rng);
+}
+
 void gemm_fp16_cublas(
     const __half *a_fp16, 
     const __half *b_fp16, 
@@ -144,11 +152,12 @@ int main(){
 
     float *a_fp32;
     float *b_fp32;
-    float *c_cpu_fp32;
 
     cudaErrCheck(cudaMallocManaged(&a_fp32, m * k * sizeof(float)));
     cudaErrCheck(cudaMallocManaged(&b_fp32, k * n * sizeof(float)));
-    cudaErrCheck(cudaMallocManaged(&c_cpu_fp32, m * n * sizeof(float)));
+
+    generate_data(a_fp32, m*k);
+    generate_data(b_fp32, k*n);
 
     float cublasTime;
     cudaEvent_t startcublas;
@@ -157,14 +166,12 @@ int main(){
     cudaErrCheck(cudaEventCreate(&startcublas));
     cudaErrCheck(cudaEventCreate(&stopcublas));
 
-    curandGenerator_t gen;
-    curandErrCheck(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
-    curandErrCheck(curandSetPseudoRandomGeneratorSeed(gen, 1337ULL));
 
-    curandErrCheck(curandGenerateUniform(gen, a_fp32, m * k));
-    curandErrCheck(curandGenerateUniform(gen, b_fp32, k * n));
 
-    for (auto i = 0; i < m*n; i++) c_cpu_fp32[i] = 0.0;
+    float *c_cpu_fp32;
+    cudaErrCheck(cudaMallocManaged(&c_cpu_fp32, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_cpu_fp32[i] = 0.0f;
 
     auto start = std::chrono::high_resolution_clock::now();
     gemm_cpu(a_fp32, b_fp32, c_cpu_fp32, 1.0, 0.0, m, n, k);
