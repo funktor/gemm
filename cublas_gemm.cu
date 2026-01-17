@@ -195,14 +195,12 @@ void gemm_fp32_cuda_tiled_2D(
         for (int r = 0; r < COARSE_FACTOR_2D; r++) {
             int row = row_start + r*TILE_WIDTH;
 
-            if (row < m && ph + tx < k) Mds[ty*TILE_WIDTH+tx] = a_fp32[row*k + ph + tx];
-            else Mds[ty*TILE_WIDTH+tx] = 0.0f;
+            Mds[ty*TILE_WIDTH+tx] = a_fp32[row*k + ph + tx];
 
             for (int c = 0; c < COARSE_FACTOR_2D; c++) {
                 int col = col_start + c*TILE_WIDTH;
 
-                if (ph + ty < k && col < n) Nds[ty*TILE_WIDTH+tx] = b_fp32[(ph + ty)*n + col];
-                else Nds[ty*TILE_WIDTH+tx] = 0.0f;
+                Nds[ty*TILE_WIDTH+tx] = b_fp32[(ph + ty)*n + col];
                 __syncthreads();
 
                 for (int i = 0; i < TILE_WIDTH; i++) Pval[r*COARSE_FACTOR_2D + c] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx];
@@ -215,7 +213,7 @@ void gemm_fp32_cuda_tiled_2D(
         int row = row_start + r*TILE_WIDTH;
         for (int c = 0; c < COARSE_FACTOR_2D; c++) {
             int col = col_start + c*TILE_WIDTH;
-            if (row < m && col < n) c_fp32[row*n+col] = Pval[r*COARSE_FACTOR_2D + c];
+            c_fp32[row*n+col] = Pval[r*COARSE_FACTOR_2D + c];
         }
     }
 }
