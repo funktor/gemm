@@ -258,10 +258,10 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
                 __syncthreads();
 
                 for (int i = 0; i < TILE_WIDTH; i++) {
-                    Pval[r*COARSE_FACTOR_2D + c] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4];
-                    Pval[r*COARSE_FACTOR_2D + c + 1] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4+1];
-                    Pval[r*COARSE_FACTOR_2D + c + 2] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4+2];
-                    Pval[r*COARSE_FACTOR_2D + c + 3] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4+3];
+                    Pval[r*COARSE_FACTOR_2D*4 + c] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4];
+                    Pval[r*COARSE_FACTOR_2D*4 + c + 1] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4+1];
+                    Pval[r*COARSE_FACTOR_2D*4 + c + 2] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4+2];
+                    Pval[r*COARSE_FACTOR_2D*4 + c + 3] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4+3];
                 }
                 __syncthreads();
             }
@@ -273,10 +273,10 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
         for (int c = 0; c < COARSE_FACTOR_2D; c++) {
             int col = col_start + c*TILE_WIDTH;
 
-            c_fp32[row*n + col] = Pval[r*COARSE_FACTOR_2D + c];
-            c_fp32[row*n + col + 1] = Pval[r*COARSE_FACTOR_2D + c + 1];
-            c_fp32[row*n + col + 2] = Pval[r*COARSE_FACTOR_2D + c + 2];
-            c_fp32[row*n + col + 3] = Pval[r*COARSE_FACTOR_2D + c + 3];
+            c_fp32[row*n + col] = Pval[r*COARSE_FACTOR_2D*4 + c];
+            c_fp32[row*n + col + 1] = Pval[r*COARSE_FACTOR_2D*4 + c + 1];
+            c_fp32[row*n + col + 2] = Pval[r*COARSE_FACTOR_2D*4 + c + 2];
+            c_fp32[row*n + col + 3] = Pval[r*COARSE_FACTOR_2D*4 + c + 3];
         }
     }
 }
