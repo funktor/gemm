@@ -258,10 +258,10 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
                 __syncthreads();
 
                 for (int i = 0; i < TILE_WIDTH; i++) {
-                    Pval[r*COARSE_FACTOR_2D + c] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx];
-                    Pval[r*COARSE_FACTOR_2D + c + 1] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx+1];
-                    Pval[r*COARSE_FACTOR_2D + c + 2] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx+2];
-                    Pval[r*COARSE_FACTOR_2D + c + 3] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx+3];
+                    Pval[r*COARSE_FACTOR_2D + c] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4];
+                    Pval[r*COARSE_FACTOR_2D + c + 1] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4+1];
+                    Pval[r*COARSE_FACTOR_2D + c + 2] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4+2];
+                    Pval[r*COARSE_FACTOR_2D + c + 3] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx*4+3];
                 }
                 __syncthreads();
             }
