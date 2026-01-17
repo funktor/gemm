@@ -241,7 +241,7 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
     int ty = threadIdx.y;
 
     int row_start = by*TILE_WIDTH*COARSE_FACTOR_2D + ty;
-    int col_start = bx*TILE_WIDTH*COARSE_FACTOR_2D + tx;
+    int col_start = bx*TILE_WIDTH*COARSE_FACTOR_2D + tx*4;
 
     float Pval[COARSE_FACTOR_2D*COARSE_FACTOR_2D*4];
     for (int r = 0; r < COARSE_FACTOR_2D*COARSE_FACTOR_2D*4; r++) Pval[r] = 0.0f;
@@ -254,7 +254,7 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
             for (int c = 0; c < COARSE_FACTOR_2D; c++) {
                 int col = col_start + c*TILE_WIDTH;
 
-                reinterpret_cast<float4 *>(&Nds[ty*TILE_WIDTH + tx*4])[0] = reinterpret_cast<float4 *>(&b_fp32[(ph + ty)*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + tx*4])[0];
+                reinterpret_cast<float4 *>(&Nds[ty*TILE_WIDTH + tx*4])[0] = reinterpret_cast<float4 *>(&b_fp32[(ph + ty)*n + col])[0];
                 __syncthreads();
 
                 for (int i = 0; i < TILE_WIDTH; i++) {
@@ -271,10 +271,12 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
     for (int r = 0; r < COARSE_FACTOR_2D; r++) {
         int row = row_start + r*TILE_WIDTH;
         for (int c = 0; c < COARSE_FACTOR_2D; c++) {
-            c_fp32[row*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + tx] = Pval[r*COARSE_FACTOR_2D + c];
-            c_fp32[row*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + tx + 1] = Pval[r*COARSE_FACTOR_2D + c + 1];
-            c_fp32[row*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + tx + 2] = Pval[r*COARSE_FACTOR_2D + c + 2];
-            c_fp32[row*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + tx + 3] = Pval[r*COARSE_FACTOR_2D + c + 3];
+            int col = col_start + c*TILE_WIDTH;
+
+            c_fp32[row*n + col] = Pval[r*COARSE_FACTOR_2D + c];
+            c_fp32[row*n + col + 1] = Pval[r*COARSE_FACTOR_2D + c + 1];
+            c_fp32[row*n + col + 2] = Pval[r*COARSE_FACTOR_2D + c + 2];
+            c_fp32[row*n + col + 3] = Pval[r*COARSE_FACTOR_2D + c + 3];
         }
     }
 }
