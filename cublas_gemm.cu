@@ -2,7 +2,7 @@
 using namespace nvcuda;
 
 #define TILE_WIDTH 32
-#define COARSE_FACTOR 8
+#define COARSE_FACTOR 4
 #define COARSE_FACTOR_2D 4
 
 // Define some error checking macros.
@@ -221,6 +221,65 @@ void gemm_fp32_cuda_tiled_2D(
 }
 
 
+__global__
+void gemm_fp32_cuda_tiled_2D_vectorize(
+    const float *a_fp32, 
+    const float *b_fp32, 
+    float *c_fp32, 
+    const float alpha, 
+    const float beta, 
+    const int m, 
+    const int n, 
+    const int k
+) {
+    __shared__ float Mds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ float Nds[TILE_WIDTH*TILE_WIDTH];
+
+    int bx = blockIdx.x;
+    int by = blockIdx.y;
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+
+    int row_start = by*TILE_WIDTH*COARSE_FACTOR_2D + ty;
+    int col_start = bx*TILE_WIDTH*COARSE_FACTOR_2D + tx;
+
+    float Pval[COARSE_FACTOR_2D*COARSE_FACTOR_2D*4];
+    for (int r = 0; r < COARSE_FACTOR_2D*COARSE_FACTOR_2D*4; r++) Pval[r] = 0.0f;
+
+    for (int ph = 0; ph < k; ph += TILE_WIDTH) {
+        for (int r = 0; r < COARSE_FACTOR_2D; r++) {
+            int row = row_start + r*TILE_WIDTH;
+            reinterpret_cast<float4 *>(&Mds[ty*TILE_WIDTH + tx*4])[0] = reinterpret_cast<float4 *>(&a_fp32[row*k + ph + tx*4])[0];
+
+            for (int c = 0; c < COARSE_FACTOR_2D; c++) {
+                int col = col_start + c*TILE_WIDTH;
+
+                reinterpret_cast<float4 *>(&Nds[ty*TILE_WIDTH + tx*4])[0] = reinterpret_cast<float4 *>(&b_fp32[(ph + ty)*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + tx*4])[0];
+                __syncthreads();
+
+                for (int i = 0; i < TILE_WIDTH; i++) {
+                    Pval[r*COARSE_FACTOR_2D + c] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx];
+                    Pval[r*COARSE_FACTOR_2D + c + 1] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx+1];
+                    Pval[r*COARSE_FACTOR_2D + c + 2] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx+2];
+                    Pval[r*COARSE_FACTOR_2D + c + 3] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx+3];
+                }
+                __syncthreads();
+            }
+        }
+    }
+
+    for (int r = 0; r < COARSE_FACTOR_2D; r++) {
+        int row = row_start + r*TILE_WIDTH;
+        for (int c = 0; c < COARSE_FACTOR_2D; c++) {
+            c_fp32[row*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + tx] = Pval[r*COARSE_FACTOR_2D + c];
+            c_fp32[row*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + tx + 1] = Pval[r*COARSE_FACTOR_2D + c + 1];
+            c_fp32[row*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + tx + 2] = Pval[r*COARSE_FACTOR_2D + c + 2];
+            c_fp32[row*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + tx + 3] = Pval[r*COARSE_FACTOR_2D + c + 3];
+        }
+    }
+}
+
+
 bool compare_matrices(const float *x, const float *y, const long n) {
     for (auto i = 0; i < n; i++) {
         float v1 = x[i];
@@ -342,6 +401,26 @@ int main(){
     cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
     std::cout << "GPU CUDA TILED 2D FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d, m*n) << std::endl;
+
+
+
+
+    float *c_gpu_fp32_tiled_2d_vec;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled_2d_vec, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_vec[i] = 0.0f;
+
+    dim3 bd3(8, 32, 1);
+    dim3 gd3((n+8*COARSE_FACTOR_2D-1)/(8*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_fp32_cuda_tiled_2D_vectorize<<<gd3, bd3>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d_vec, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU CUDA TILED 2D VEC FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d_vec, m*n) << std::endl;
 
 
 
