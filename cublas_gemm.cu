@@ -412,8 +412,8 @@ int main(){
 
     for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_vec[i] = 0.0f;
 
-    dim3 bd3(8, 32, 1);
-    dim3 gd3((n+8*COARSE_FACTOR_2D-1)/(8*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
+    dim3 bd3(32, 32, 1);
+    dim3 gd3((n+32*COARSE_FACTOR_2D*4-1)/(32*COARSE_FACTOR_2D*4), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_fp32_cuda_tiled_2D_vectorize<<<gd3, bd3>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d_vec, 1.0, 0.0, m, n, k);
