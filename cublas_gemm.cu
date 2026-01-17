@@ -4,6 +4,10 @@ using namespace nvcuda;
 #define TILE_WIDTH 32
 #define COARSE_FACTOR 4
 #define COARSE_FACTOR_2D 4
+#define WMMA_M 16
+#define WMMA_N 16
+#define WMMA_K 16
+
 
 // Define some error checking macros.
 #define cudaErrCheck(stat) { cudaErrCheck_((stat), __FILE__, __LINE__); }
@@ -281,6 +285,58 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
     }
 }
 
+__global__ 
+void gemm_wmma(
+    const half *a, 
+    const half *b, 
+    float *c, 
+    const float alpha, 
+    const float beta, 
+    const int m, 
+    const int n, 
+    const int k
+) {
+    int lda = k;
+    int ldb = n;
+    int ldc = n;
+
+    int warpM = (blockIdx.y * blockDim.y + threadIdx.y);
+    int warpN = (blockIdx.x * blockDim.x + threadIdx.x) / 32;
+
+    wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> a_frag;
+    wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> b_frag;
+    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> acc_frag;
+    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
+
+    wmma::fill_fragment(acc_frag, 0.0f);
+
+    for (int i = 0; i < k; i += WMMA_K) {
+        int aRow = warpM * WMMA_M;
+        int aCol = i;
+
+        int bRow = i;
+        int bCol = warpN * WMMA_N;
+
+        if (aRow < m && aCol < k && bRow < k && bCol < n) {
+            wmma::load_matrix_sync(a_frag, a + aRow * lda + aCol, lda);
+            wmma::load_matrix_sync(b_frag, b + bRow * ldb + bCol, ldb);
+            wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
+        }
+    }
+
+    int cRow = warpM * WMMA_M;
+    int cCol = warpN * WMMA_N;
+
+    if (cRow < m && cCol < n) {
+        wmma::load_matrix_sync(c_frag, c + cRow * ldc + cCol, ldc, wmma::mem_row_major);
+
+        #pragma unroll
+        for(int i=0; i < c_frag.num_elements; i++) c_frag.x[i] = alpha * acc_frag.x[i] + beta * c_frag.x[i];
+
+        wmma::store_matrix_sync(c + cRow * ldc + cCol, c_frag, ldc, wmma::mem_row_major);
+    }
+}
+
 
 bool compare_matrices(const float *x, const float *y, const long n) {
     for (auto i = 0; i < n; i++) {
@@ -309,9 +365,9 @@ __global__
 void convertFp32ToFp16 (half *out, const float *in, const long n) {
     long idx = blockDim.x * blockIdx.x + threadIdx.x;
     if (idx < n) {
-       out[idx] = in[idx];
+        out[idx] = in[idx];
     }
- }
+}
 
 int main(){
     int m = 2048;
@@ -426,6 +482,34 @@ int main(){
 
 
 
+    half *a_fp16;
+    half *b_fp16;
+    float *c_gpu_fp32_wmma;
+
+    cudaErrCheck(cudaMallocManaged(&a_fp16, m * k * sizeof(half)));
+    cudaErrCheck(cudaMallocManaged(&b_fp16, k * n * sizeof(half)));
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_wmma, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_wmma[i] = 0.0f;
+
+    convertFp32ToFp16 <<< (m * k + 255) / 256, 256 >>> (a_fp16, a_fp32, m * k);
+    convertFp32ToFp16 <<< (k * n + 255) / 256, 256 >>> (b_fp16, b_fp32, k * n);
+    cudaDeviceSynchronize();
+
+    dim3 bd4(128, 4, 1);
+    dim3 gd4((n+WMMA_N*128/32-1)/(WMMA_N*128/32), (m+WMMA_M*4-1)/(WMMA_M*4), 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_wmma<<<gd4, bd4>>>(a_fp16, b_fp16, c_gpu_fp32_wmma, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU CUDA TILED 2D VEC FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_wmma, m*n) << std::endl;
+
+
+
     float *c_gpu_fp32;
     cudaErrCheck(cudaMallocManaged(&c_gpu_fp32, m * n * sizeof(float)));
 
@@ -440,19 +524,10 @@ int main(){
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32, m*n) << std::endl;
 
     
-    half *a_fp16;
-    half *b_fp16;
     float *d_gpu_fp32;
-
-    cudaErrCheck(cudaMallocManaged(&a_fp16, m * k * sizeof(half)));
-    cudaErrCheck(cudaMallocManaged(&b_fp16, k * n * sizeof(half)));
     cudaErrCheck(cudaMallocManaged(&d_gpu_fp32, m * n * sizeof(float)));
 
     for (auto i = 0; i < m*n; i++) d_gpu_fp32[i] = 0.0f;
-
-    convertFp32ToFp16 <<< (m * k + 255) / 256, 256 >>> (a_fp16, a_fp32, m * k);
-    convertFp32ToFp16 <<< (k * n + 255) / 256, 256 >>> (b_fp16, b_fp32, k * n);
-    cudaDeviceSynchronize();
 
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_fp16_cublas(a_fp16, b_fp16, d_gpu_fp32, 1.0, 0.0, m, n, k);
