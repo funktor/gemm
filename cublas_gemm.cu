@@ -505,7 +505,7 @@ int main(){
     cudaErrCheck(cudaEventRecord(stopcublas));
     cudaErrCheck(cudaEventSynchronize(stopcublas));
     cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    std::cout << "GPU CUDA TILED 2D VEC FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "GPU WMMA FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_wmma, m*n) << std::endl;
 
 
