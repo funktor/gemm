@@ -223,8 +223,8 @@ void gemm_fp32_cuda_tiled_2D(
 
 __global__
 void gemm_fp32_cuda_tiled_2D_vectorize(
-    const float *a_fp32, 
-    const float *b_fp32, 
+    float *a_fp32, 
+    float *b_fp32, 
     float *c_fp32, 
     const float alpha, 
     const float beta, 
