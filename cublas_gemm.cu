@@ -496,8 +496,8 @@ int main(){
     convertFp32ToFp16 <<< (k * n + 255) / 256, 256 >>> (b_fp16, b_fp32, k * n);
     cudaDeviceSynchronize();
 
-    dim3 bd4(128, 4, 1);
-    dim3 gd4((n+WMMA_N*128/32-1)/(WMMA_N*128/32), (m+WMMA_M*4-1)/(WMMA_M*4), 1);
+    dim3 bd4(128, 8, 1);
+    dim3 gd4((n+WMMA_N*128/32-1)/(WMMA_N*128/32), (m+WMMA_M*8-1)/(WMMA_M*8), 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_wmma<<<gd4, bd4>>>(a_fp16, b_fp16, c_gpu_fp32_wmma, 1.0, 0.0, m, n, k);
