@@ -386,6 +386,7 @@ void gemm_wmma_shmm(
 
         __syncthreads();
 
+        #pragma unroll
         for (int j = 0; j < TILE_WIDTH_WMMA; j += WMMA_K) {
             int a_warp_row = threadIdx.y * WMMA_M;
             int a_warp_col = j;
