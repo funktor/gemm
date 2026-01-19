@@ -349,8 +349,8 @@ void gemm_wmma_shmm(
     const int n, 
     const int k
 ) {
-    __shared__ float Mds[TILE_WIDTH*TILE_WIDTH];
-    __shared__ float Nds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ half Mds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ half Nds[TILE_WIDTH*TILE_WIDTH];
 
     int lda = k;
     int ldb = n;
