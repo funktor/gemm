@@ -338,6 +338,82 @@ void gemm_wmma(
 }
 
 
+__global__ 
+void gemm_wmma_shmm(
+    const half *a, 
+    const half *b, 
+    float *c, 
+    const float alpha, 
+    const float beta, 
+    const int m, 
+    const int n, 
+    const int k
+) {
+    __shared__ float Mds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ float Nds[TILE_WIDTH*TILE_WIDTH];
+
+    int lda = k;
+    int ldb = n;
+    int ldc = n;
+
+    int warpM = (blockIdx.y * blockDim.y + threadIdx.y);
+    int warpN = (blockIdx.x * blockDim.x + threadIdx.x) / 32;
+
+    wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> a_frag;
+    wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> b_frag;
+    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> acc_frag;
+    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
+
+    wmma::fill_fragment(acc_frag, 0.0f);
+
+    for (int i = 0; i < k; i += TILE_WIDTH) {
+        int a_block_row = blockIdx.y * TILE_WIDTH;
+        int a_block_col = i;
+        int a_idx = threadIdx.y * blockDim.x + threadIdx.x;
+
+        for (int j = a_idx; j < TILE_WIDTH*TILE_WIDTH; j += blockDim.x * blockDim.y) {
+            Mds[j] = a[(a_block_row + j/TILE_WIDTH) * TILE_WIDTH + a_block_col + (j % TILE_WIDTH)];
+        }
+
+        int b_block_row = i;
+        int b_block_col = blockIdx.x * TILE_WIDTH;
+        int b_idx = threadIdx.y * blockDim.x + threadIdx.x;
+
+        for (int j = b_idx; j < TILE_WIDTH*TILE_WIDTH; j += blockDim.x * blockDim.y) {
+            Nds[j] = b[(b_block_row + j/TILE_WIDTH) * TILE_WIDTH + b_block_col + (j % TILE_WIDTH)];
+        }
+
+        __syncthreads();
+
+        for (int j = 0; j < TILE_WIDTH; j += WMMA_K) {
+            int a_warp_row = threadIdx.y * WMMA_M;
+            int a_warp_col = j;
+
+            int b_warp_row = j;
+            int b_warp_col = (threadIdx.x / 32) * WMMA_N;
+
+            if (a_warp_row < TILE_WIDTH && a_warp_col < TILE_WIDTH && b_warp_row < TILE_WIDTH && b_warp_col < TILE_WIDTH) {
+                wmma::load_matrix_sync(a_frag, Mds + a_warp_row * TILE_WIDTH + a_warp_col, TILE_WIDTH);
+                wmma::load_matrix_sync(b_frag, Nds + b_warp_row * TILE_WIDTH + b_warp_col, TILE_WIDTH);
+                wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
+            }
+        }
+    }
+
+    int cRow = warpM * WMMA_M;
+    int cCol = warpN * WMMA_N;
+
+    if (cRow < m && cCol < n) {
+        wmma::load_matrix_sync(c_frag, c + cRow * ldc + cCol, ldc, wmma::mem_row_major);
+
+        #pragma unroll
+        for(int i=0; i < c_frag.num_elements; i++) c_frag.x[i] = alpha * acc_frag.x[i] + beta * c_frag.x[i];
+
+        wmma::store_matrix_sync(c + cRow * ldc + cCol, c_frag, ldc, wmma::mem_row_major);
+    }
+}
+
+
 bool compare_matrices(const float *x, const float *y, const long n) {
     for (auto i = 0; i < n; i++) {
         float v1 = x[i];
@@ -496,8 +572,8 @@ int main(){
     convertFp32ToFp16 <<< (k * n + 255) / 256, 256 >>> (b_fp16, b_fp32, k * n);
     cudaDeviceSynchronize();
 
-    dim3 bd4(128, 8, 1);
-    dim3 gd4((n+WMMA_N*128/32-1)/(WMMA_N*128/32), (m+WMMA_M*8-1)/(WMMA_M*8), 1);
+    dim3 bd4(128, 4, 1);
+    dim3 gd4((n+WMMA_N*128/32-1)/(WMMA_N*128/32), (m+WMMA_M*4-1)/(WMMA_M*4), 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_wmma<<<gd4, bd4>>>(a_fp16, b_fp16, c_gpu_fp32_wmma, 1.0, 0.0, m, n, k);
@@ -508,6 +584,24 @@ int main(){
     std::cout << "GPU WMMA FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_wmma, m*n) << std::endl;
 
+
+
+    float *c_gpu_fp32_wmma_shmm;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_wmma_shmm, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_wmma_shmm[i] = 0.0f;
+
+    dim3 bd5(128, 4, 1);
+    dim3 gd5((n+WMMA_N*128/32-1)/(WMMA_N*128/32), (m+WMMA_M*4-1)/(WMMA_M*4), 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_wmma_shmm<<<gd5, bd5>>>(a_fp16, b_fp16, c_gpu_fp32_wmma_shmm, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU WMMA SHMM FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_wmma_shmm, m*n) << std::endl;
 
 
     float *c_gpu_fp32;
