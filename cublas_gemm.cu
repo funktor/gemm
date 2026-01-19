@@ -399,6 +399,8 @@ void gemm_wmma_shmm(
                 wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
             }
         }
+
+        __syncthreads();
     }
 
     int cRow = warpM * WMMA_M;
