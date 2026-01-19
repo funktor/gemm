@@ -2,6 +2,7 @@
 using namespace nvcuda;
 
 #define TILE_WIDTH 32
+#define TILE_WIDTH_WMMA 64
 #define COARSE_FACTOR 4
 #define COARSE_FACTOR_2D 4
 #define WMMA_M 16
@@ -349,8 +350,8 @@ void gemm_wmma_shmm(
     const int n, 
     const int k
 ) {
-    __shared__ half Mds[TILE_WIDTH*TILE_WIDTH];
-    __shared__ half Nds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ half Mds[TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
+    __shared__ half Nds[TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
 
     int lda = k;
     int ldb = n;
@@ -366,35 +367,35 @@ void gemm_wmma_shmm(
 
     wmma::fill_fragment(acc_frag, 0.0f);
 
-    for (int i = 0; i < k; i += TILE_WIDTH) {
-        int a_block_row = blockIdx.y * TILE_WIDTH;
+    for (int i = 0; i < k; i += TILE_WIDTH_WMMA) {
+        int a_block_row = blockIdx.y * TILE_WIDTH_WMMA;
         int a_block_col = i;
         int a_idx = threadIdx.y * blockDim.x + threadIdx.x;
 
-        for (int j = a_idx; j < TILE_WIDTH*TILE_WIDTH; j += blockDim.x * blockDim.y) {
-            Mds[j] = a[(a_block_row + j/TILE_WIDTH) * k + a_block_col + (j % TILE_WIDTH)];
+        for (int j = a_idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
+            Mds[j] = a[(a_block_row + j/TILE_WIDTH_WMMA) * k + a_block_col + (j % TILE_WIDTH_WMMA)];
         }
 
         int b_block_row = i;
-        int b_block_col = blockIdx.x * TILE_WIDTH;
+        int b_block_col = blockIdx.x * TILE_WIDTH_WMMA;
         int b_idx = threadIdx.y * blockDim.x + threadIdx.x;
 
-        for (int j = b_idx; j < TILE_WIDTH*TILE_WIDTH; j += blockDim.x * blockDim.y) {
-            Nds[j] = b[(b_block_row + j/TILE_WIDTH) * n + b_block_col + (j % TILE_WIDTH)];
+        for (int j = b_idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
+            Nds[j] = b[(b_block_row + j/TILE_WIDTH_WMMA) * n + b_block_col + (j % TILE_WIDTH_WMMA)];
         }
 
         __syncthreads();
 
-        for (int j = 0; j < TILE_WIDTH; j += WMMA_K) {
+        for (int j = 0; j < TILE_WIDTH_WMMA; j += WMMA_K) {
             int a_warp_row = threadIdx.y * WMMA_M;
             int a_warp_col = j;
 
             int b_warp_row = j;
             int b_warp_col = (threadIdx.x / 32) * WMMA_N;
 
-            if (a_warp_row < TILE_WIDTH && a_warp_col < TILE_WIDTH && b_warp_row < TILE_WIDTH && b_warp_col < TILE_WIDTH) {
-                wmma::load_matrix_sync(a_frag, Mds + a_warp_row * TILE_WIDTH + a_warp_col, lda);
-                wmma::load_matrix_sync(b_frag, Nds + b_warp_row * TILE_WIDTH + b_warp_col, ldb);
+            if (a_warp_row < TILE_WIDTH_WMMA && a_warp_col < TILE_WIDTH_WMMA && b_warp_row < TILE_WIDTH_WMMA && b_warp_col < TILE_WIDTH_WMMA) {
+                wmma::load_matrix_sync(a_frag, Mds + a_warp_row * TILE_WIDTH_WMMA + a_warp_col, TILE_WIDTH_WMMA);
+                wmma::load_matrix_sync(b_frag, Nds + b_warp_row * TILE_WIDTH_WMMA + b_warp_col, TILE_WIDTH_WMMA);
                 wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
             }
         }
