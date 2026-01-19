@@ -393,8 +393,8 @@ void gemm_wmma_shmm(
             int b_warp_col = (threadIdx.x / 32) * WMMA_N;
 
             if (a_warp_row < TILE_WIDTH && a_warp_col < TILE_WIDTH && b_warp_row < TILE_WIDTH && b_warp_col < TILE_WIDTH) {
-                wmma::load_matrix_sync(a_frag, Mds + a_warp_row * TILE_WIDTH + a_warp_col, TILE_WIDTH);
-                wmma::load_matrix_sync(b_frag, Nds + b_warp_row * TILE_WIDTH + b_warp_col, TILE_WIDTH);
+                wmma::load_matrix_sync(a_frag, Mds + a_warp_row * TILE_WIDTH + a_warp_col, lda);
+                wmma::load_matrix_sync(b_frag, Nds + b_warp_row * TILE_WIDTH + b_warp_col, ldb);
                 wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
             }
         }
