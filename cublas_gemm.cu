@@ -372,7 +372,7 @@ void gemm_wmma_shmm(
         int a_idx = threadIdx.y * blockDim.x + threadIdx.x;
 
         for (int j = a_idx; j < TILE_WIDTH*TILE_WIDTH; j += blockDim.x * blockDim.y) {
-            Mds[j] = a[(a_block_row + j/TILE_WIDTH) * TILE_WIDTH + a_block_col + (j % TILE_WIDTH)];
+            Mds[j] = a[(a_block_row + j/TILE_WIDTH) * k + a_block_col + (j % TILE_WIDTH)];
         }
 
         int b_block_row = i;
@@ -380,7 +380,7 @@ void gemm_wmma_shmm(
         int b_idx = threadIdx.y * blockDim.x + threadIdx.x;
 
         for (int j = b_idx; j < TILE_WIDTH*TILE_WIDTH; j += blockDim.x * blockDim.y) {
-            Nds[j] = b[(b_block_row + j/TILE_WIDTH) * TILE_WIDTH + b_block_col + (j % TILE_WIDTH)];
+            Nds[j] = b[(b_block_row + j/TILE_WIDTH) * n + b_block_col + (j % TILE_WIDTH)];
         }
 
         __syncthreads();
