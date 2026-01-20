@@ -156,7 +156,7 @@ void gemm_fp32_cuda_tiled(
 
         for (int j = 0; j < COARSE_FACTOR; j++) {
             int b_row = ph;
-            int b_col = blockIdx.x * TILE_WIDTH + j*TILE_WIDTH;
+            int b_col = blockIdx.x * TILE_WIDTH * COARSE_FACTOR + j*TILE_WIDTH;
             int b_idx = ty * blockDim.x + tx;
 
             for (int i = b_idx; i < TILE_WIDTH*TILE_WIDTH; i += blockDim.x * blockDim.y) {
