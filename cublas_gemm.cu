@@ -154,42 +154,44 @@ void gemm_fp32_cuda_tiled(
             Mds[i] = a_fp32[(a_row + i/TILE_WIDTH) * k + (a_col + i % TILE_WIDTH)];
         }
 
-        for (int j = 0; j < COARSE_FACTOR; j++) {
-            int b_row = ph;
-            int b_col = bx * TILE_WIDTH * COARSE_FACTOR + j*TILE_WIDTH;
-            int b_idx = ty * blockDim.x + tx;
+        __syncthreads();
 
-            for (int i = b_idx; i < TILE_WIDTH*TILE_WIDTH; i += blockDim.x * blockDim.y) {
-                Nds[i] = b_fp32[(b_row + i/TILE_WIDTH) * n + (b_col + i % TILE_WIDTH)];
-            }
+        // for (int j = 0; j < COARSE_FACTOR; j++) {
+        //     int b_row = ph;
+        //     int b_col = bx * TILE_WIDTH * COARSE_FACTOR + j*TILE_WIDTH;
+        //     int b_idx = ty * blockDim.x + tx;
 
-            __syncthreads();
-
-            for (int i = 0; i < TILE_WIDTH; i++) {
-                Pval[j] += Mds[ty*TILE_WIDTH + i] * Nds[i*TILE_WIDTH + tx];
-            }
-
-            __syncthreads();
-        }
-
-        // for (int q = 0; q < TILE_WIDTH; q++) {
-        //     float tmp = Mds[ty*TILE_WIDTH + q];
-
-        //     for (int j = 0; j < COARSE_FACTOR; j++) {
-        //         int b_row = ph;
-        //         int b_col = blockIdx.x * TILE_WIDTH + j*TILE_WIDTH;
-        //         int b_idx = ty * blockDim.x + tx;
-
-        //         for (int i = b_idx; i < TILE_WIDTH*TILE_WIDTH; i += blockDim.x * blockDim.y) {
-        //             Nds[i] = b_fp32[(b_row + i/TILE_WIDTH) * n + (b_col + i % TILE_WIDTH)];
-        //         }
-
-        //         __syncthreads();
-
-        //         Pval[j] += tmp * Nds[q*TILE_WIDTH + tx];
-        //         __syncthreads();
+        //     for (int i = b_idx; i < TILE_WIDTH*TILE_WIDTH; i += blockDim.x * blockDim.y) {
+        //         Nds[i] = b_fp32[(b_row + i/TILE_WIDTH) * n + (b_col + i % TILE_WIDTH)];
         //     }
+
+        //     __syncthreads();
+
+        //     for (int i = 0; i < TILE_WIDTH; i++) {
+        //         Pval[j] += Mds[ty*TILE_WIDTH + i] * Nds[i*TILE_WIDTH + tx];
+        //     }
+
+        //     __syncthreads();
         // }
+
+        for (int q = 0; q < TILE_WIDTH; q++) {
+            float tmp = Mds[ty*TILE_WIDTH + q];
+
+            for (int j = 0; j < COARSE_FACTOR; j++) {
+                int b_row = ph;
+                int b_col = bx * TILE_WIDTH * COARSE_FACTOR + j*TILE_WIDTH;
+                int b_idx = ty * blockDim.x + tx;
+
+                for (int i = b_idx; i < TILE_WIDTH*TILE_WIDTH; i += blockDim.x * blockDim.y) {
+                    Nds[i] = b_fp32[(b_row + i/TILE_WIDTH) * n + (b_col + i % TILE_WIDTH)];
+                }
+
+                __syncthreads();
+
+                Pval[j] += tmp * Nds[q*TILE_WIDTH + tx];
+                __syncthreads();
+            }
+        }
     }
 
     for (int j = 0; j < COARSE_FACTOR; j++) {
