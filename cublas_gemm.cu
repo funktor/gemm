@@ -154,6 +154,8 @@ void gemm_fp32_cuda_tiled(
             Mds[i] = a_fp32[(a_row + i/TILE_WIDTH) * k + (a_col + i % TILE_WIDTH)];
         }
 
+        __syncthreads();
+
         for (int q = 0; q < TILE_WIDTH; q++) {
             float tmp = Mds[ty*TILE_WIDTH + q];
 
