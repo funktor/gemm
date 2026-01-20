@@ -146,7 +146,7 @@ void gemm_fp32_cuda_tiled(
     for (int r = 0; r < COARSE_FACTOR; r++) Pval[r] = 0.0f;
 
     for (int ph = 0; ph < k; ph += TILE_WIDTH) {
-        int a_row = blockIdx.y * TILE_WIDTH;
+        int a_row = by * TILE_WIDTH;
         int a_col = ph;
         int a_idx = ty * blockDim.x + tx;
 
@@ -156,7 +156,7 @@ void gemm_fp32_cuda_tiled(
 
         for (int j = 0; j < COARSE_FACTOR; j++) {
             int b_row = ph;
-            int b_col = blockIdx.x * TILE_WIDTH * COARSE_FACTOR + j*TILE_WIDTH;
+            int b_col = bx * TILE_WIDTH * COARSE_FACTOR + j*TILE_WIDTH;
             int b_idx = ty * blockDim.x + tx;
 
             for (int i = b_idx; i < TILE_WIDTH*TILE_WIDTH; i += blockDim.x * blockDim.y) {
@@ -194,7 +194,7 @@ void gemm_fp32_cuda_tiled(
 
     for (int j = 0; j < COARSE_FACTOR; j++) {
         int row = by * TILE_WIDTH + ty;
-        int col = bx * TILE_WIDTH + j*TILE_WIDTH + tx;
+        int col = bx * TILE_WIDTH * COARSE_FACTOR + j*TILE_WIDTH + tx;
         c_fp32[row*n + col] = alpha*Pval[j] + beta*c_fp32[row*n + col];
     }
 
