@@ -449,6 +449,8 @@ void gemm_mma_sync_fp16(
             Nds[j] = b[(b_row + j/TILE_WIDTH_WMMA) * n + (b_col + j % TILE_WIDTH_WMMA)];
         }
 
+        __syncthreads();
+
         for (int j = 0; j < TILE_WIDTH_WMMA; j += 16) {
             int m_row = threadIdx.y * 16;
             int m_col = j;
@@ -468,6 +470,8 @@ void gemm_mma_sync_fp16(
 
             uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + (idx % 32) % 16) * TILE_WIDTH_WMMA + n_col_1]);
             uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + (idx % 32) % 16) * TILE_WIDTH_WMMA + n_col_2]);
+
+            __syncthreads();
 
             asm volatile(
                 "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
