@@ -451,6 +451,11 @@ void gemm_mma_sync_fp16(
         uint32_t regs_a[4];
         uint32_t regs_b[2];
         float regs_c[4];
+
+        regs_c[0] = 0.0f;
+        regs_c[1] = 0.0f;
+        regs_c[2] = 0.0f;
+        regs_c[3] = 0.0f;
         
         uint32_t addr_a = __cvta_generic_to_shared(&Mds[(threadIdx.x % 16) * 16 + (threadIdx.x/16) * 8]);
         uint32_t addr_b = __cvta_generic_to_shared(&Nds[(threadIdx.x % 16) * 16]);
@@ -479,7 +484,6 @@ void gemm_mma_sync_fp16(
             : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b[0]), "r"(regs_b[1])
         );
 
-        int idx = threadIdx.y * blockDim.x + threadIdx.x;
         for (int i = 0; i < 4; i++) {
             int rw = (idx >> 2) + 8 * (i / 2);
             int cl = 2 * (idx % 4) + (i % 2);
