@@ -468,14 +468,14 @@ void gemm_mma_sync_fp16(
         );
 
         asm volatile(
-            "ldmatrix.sync.aligned.m8n8.x2.shared.b16 "
+            "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
             "{%0, %1}, [%2];"
             : "=r"(regs_b[0]), "=r"(regs_b[1])
             : "r"(addr_b)
         );
 
         asm volatile(
-            "mma.sync.aligned.m16n8k16.row.row.f32.f16.f16.f32 "
+            "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
             "{%0, %1, %2, %3}, "
             "{%4, %5, %6, %7}, "
             "{%8, %9}, "
