@@ -445,7 +445,7 @@ void gemm_mma_sync_fp16(
         int b_col = blockIdx.x * 8;
 
         for (int j = idx; j < 128; j += blockDim.x * blockDim.y) {
-            Nds[j] = b[(b_row + j/8) * k + (b_col + j % 8)];
+            Nds[j] = b[(b_row + j/8) * n + (b_col + j % 8)];
         }
 
         uint32_t regs_a[4];
