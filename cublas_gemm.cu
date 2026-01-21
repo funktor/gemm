@@ -515,17 +515,11 @@ void gemm_mma_sync_fp16(
             );
     
             #pragma unroll
-            for (int i = 0; i < 4; i++) {
-                int rw = ((idx % 32) >> 2) + 8 * (i / 2);
-                int cl = 2 * ((idx % 32) % 4) + (i % 2);
-                c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[i];
-            }
-
-            #pragma unroll
-            for (int i = 0; i < 4; i++) {
-                int rw = ((idx % 32) >> 2) + 8 * (i / 2);
-                int cl = 2 * ((idx % 32) % 4) + (i % 2);
-                c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[i];
+            for (int q = 0; q < 4; q++) {
+                int rw = ((idx % 32) >> 2) + 8 * (q / 2);
+                int cl = 2 * ((idx % 32) % 4) + (q % 2);
+                c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[q];
+                c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
             }
         }
     }
