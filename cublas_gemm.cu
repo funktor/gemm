@@ -452,11 +452,11 @@ void gemm_mma_sync_fp16(
         __syncthreads();
 
         for (int j = 0; j < TILE_WIDTH_WMMA; j += 16) {
-            int m_row = threadIdx.y * 16;
+            int m_row = (idx/32) * 16;
             int m_col = j;
 
             int n_row = j;
-            int n_col_1 = threadIdx.y * 8;
+            int n_col_1 = (idx/32) * 8;
             int n_col_2 = n_col_1 + 8;
             
             uint32_t regs_a[4];
