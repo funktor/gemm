@@ -690,7 +690,7 @@ int main(){
     for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16[i] = 0.0f;
 
     dim3 bd6(32, 1, 1);
-    dim3 gd6((n+15)/16, (m+15)/16, 1);
+    dim3 gd6((n+7)/8, (m+15)/16, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_mma_sync_fp16<<<gd6, bd6>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16, 1.0, 0.0, m, n, k);
