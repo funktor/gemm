@@ -418,6 +418,77 @@ void gemm_wmma_shmm(
 }
 
 
+__global__ 
+void gemm_mma_sync_fp16(
+    const half *a, 
+    const half *b, 
+    float *c, 
+    const float alpha, 
+    const float beta, 
+    const int m, 
+    const int n, 
+    const int k
+) {
+    __shared__ alignas(16) half Mds[256];
+    __shared__ alignas(16) half Nds[128];
+
+    for (int i = 0; i < k; i += 16) {
+        int a_row = blockIdx.y * 16;
+        int a_col = i;
+        int idx = threadIdx.y * blockDim.x + threadIdx.x;
+
+        for (int j = idx; j < 256; j += blockDim.x * blockDim.y) {
+            Mds[j] = a[(a_row + j/16) * k + (a_col + j % 16)];
+        }
+
+        int b_row = i;
+        int b_col = blockIdx.x * 8;
+
+        for (int j = idx; j < 128; j += blockDim.x * blockDim.y) {
+            Nds[j] = b[(b_row + j/8) * k + (b_col + j % 8)];
+        }
+
+        uint32_t regs_a[4];
+        uint32_t regs_b[2];
+        float regs_c[4];
+        
+        uint32_t addr_a = __cvta_generic_to_shared(&Mds[(threadIdx.x % 16) * 16 + (threadIdx.x/16) * 8]);
+        uint32_t addr_b = __cvta_generic_to_shared(&Nds[(threadIdx.x % 16) * 16]);
+
+        asm volatile(
+            "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
+            "{%0, %1, %2, %3}, [%4];"
+            : "=r"(regs_a[0]), "=r"(regs_a[1]), "=r"(regs_a[2]), "=r"(regs_a[3])
+            : "r"(addr_a)
+        );
+
+        asm volatile(
+            "ldmatrix.sync.aligned.m8n8.x2.shared.b16 "
+            "{%0, %1}, [%2];"
+            : "=r"(regs_b[0]), "=r"(regs_b[1])
+            : "r"(addr_b)
+        );
+
+        asm volatile(
+            "mma.sync.aligned.m16n8k16.row.row.f32.f16.f16.f32 "
+            "{%0, %1, %2, %3}, "
+            "{%4, %5, %6, %7}, "
+            "{%8, %9}, "
+            "{%0, %1, %2, %3};\n"
+            : "+f"(regs_c[0]), "+f"(regs_c[1]), "+f"(regs_c[2]),"+f"(regs_c[3])
+            : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b[0]), "r"(regs_b[1])
+        );
+
+        int idx = threadIdx.y * blockDim.x + threadIdx.x;
+        for (int i = 0; i < 4; i++) {
+            int rw = (idx >> 2) + 8 * (i / 2);
+            int cl = 2 * (idx % 4) + (i % 2);
+            c[(a_row + rw) * n + (b_col + cl)] += regs_c[i];
+        }
+    }
+}
+
+
 bool compare_matrices(const float *x, const float *y, const long n) {
     for (auto i = 0; i < n; i++) {
         float v1 = x[i];
@@ -606,6 +677,27 @@ int main(){
     cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
     std::cout << "GPU WMMA SHMM FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_wmma_shmm, m*n) << std::endl;
+
+
+
+    float *c_gpu_mma_sync_fp16;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_mma_sync_fp16, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16[i] = 0.0f;
+
+    dim3 bd6(32, 1, 1);
+    dim3 gd6((n+15)/16, (m+15)/16, 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_mma_sync_fp16<<<gd6, bd6>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU MMA SYNC FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_mma_sync_fp16, m*n) << std::endl;
+
+
 
 
     float *c_gpu_fp32;
