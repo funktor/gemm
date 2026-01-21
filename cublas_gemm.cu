@@ -457,8 +457,8 @@ void gemm_mma_sync_fp16(
         regs_c[2] = 0.0f;
         regs_c[3] = 0.0f;
         
-        uint32_t addr_a = __cvta_generic_to_shared(&Mds[(threadIdx.x % 16) * 16 + (threadIdx.x/16) * 8]);
-        uint32_t addr_b = __cvta_generic_to_shared(&Nds[(threadIdx.x % 16) * 16]);
+        uint32_t addr_a = __cvta_generic_to_shared(&Mds[(idx % 16) * 16 + (idx/16) * 8]);
+        uint32_t addr_b = __cvta_generic_to_shared(&Nds[(idx % 16) * 8]);
 
         asm volatile(
             "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
