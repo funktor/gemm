@@ -450,9 +450,7 @@ void gemm_mma_sync_fp16(
         int b_col = blockIdx.x * TILE_WIDTH_WMMA;
 
         for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
-            int r1 = j/TILE_WIDTH_WMMA;
-            int c1 = j % TILE_WIDTH_WMMA;
-            Nds[c1*TILE_WIDTH_WMMA + r1] = b[(b_row + r1) * n + (b_col + c1)];
+            Nds[j] = b[(b_row + j/TILE_WIDTH_WMMA) * n + (b_col + j % TILE_WIDTH_WMMA)];
         }
 
         __syncthreads();
@@ -487,14 +485,14 @@ void gemm_mma_sync_fp16(
             );
 
             asm volatile(
-                "ldmatrix.sync.aligned.m8n8.x2.shared.b16 "
+                "ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 "
                 "{%0, %1}, [%2];"
                 : "=r"(regs_b_1[0]), "=r"(regs_b_1[1])
                 : "r"(addr_b_1)
             );
 
             asm volatile(
-                "ldmatrix.sync.aligned.m8n8.x2.shared.b16 "
+                "ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 "
                 "{%0, %1}, [%2];"
                 : "=r"(regs_b_2[0]), "=r"(regs_b_2[1])
                 : "r"(addr_b_2)
