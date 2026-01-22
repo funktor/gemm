@@ -432,14 +432,6 @@ void gemm_mma_sync_fp16(
     __shared__ alignas(16) half Mds[TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
     __shared__ alignas(16) half Nds[TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
 
-    uint32_t regs_a[4];
-
-    uint32_t regs_b_1[2];
-    uint32_t regs_b_2[2];
-
-    float regs_c_1[4] = {0.0f};
-    float regs_c_2[4] = {0.0f};
-
     int idx = threadIdx.y * blockDim.x + threadIdx.x;
 
     int warp_row_id = idx/blockDim.x;
@@ -465,6 +457,14 @@ void gemm_mma_sync_fp16(
 
         #pragma unroll
         for (int j = 0; j < TILE_WIDTH_WMMA; j += 16) {
+            uint32_t regs_a[4];
+
+            uint32_t regs_b_1[2];
+            uint32_t regs_b_2[2];
+
+            float regs_c_1[4] = {0.0f};
+            float regs_c_2[4] = {0.0f};
+
             int m_row = warp_row_id * 16;
             int m_col = j;
 
