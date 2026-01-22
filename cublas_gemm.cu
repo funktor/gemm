@@ -452,7 +452,7 @@ void gemm_mma_sync_fp16(
         for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
             int r1 = j/TILE_WIDTH_WMMA;
             int c1 = j % TILE_WIDTH_WMMA;
-            Nds[c1*TILE_WIDTH_WMMA + j1] = b[(b_row + r1) * n + (b_col + c1)];
+            Nds[c1*TILE_WIDTH_WMMA + r1] = b[(b_row + r1) * n + (b_col + c1)];
         }
 
         __syncthreads();
