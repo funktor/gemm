@@ -463,9 +463,9 @@ void gemm_mma_sync_fp16(
         float regs_c_1[4] = {0.0f};
         float regs_c_2[4] = {0.0f};
 
-        uint32_t addr_a = __cvta_generic_to_shared(&Mds[(thread_id_in_warp % 16) * TILE_WIDTH_WMMA + (thread_id_in_warp/16) * 8]);
-        uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(thread_id_in_warp % 16) * TILE_WIDTH_WMMA]);
-        uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(thread_id_in_warp % 16) * TILE_WIDTH_WMMA + 8]);
+        uint32_t addr_a = __cvta_generic_to_shared(&Mds[(thread_id_in_warp % 16) * 16 + (thread_id_in_warp/16) * 8]);
+        uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(thread_id_in_warp % 16) * 16]);
+        uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(thread_id_in_warp % 16) * 16 + 8]);
 
         __syncthreads();
 
