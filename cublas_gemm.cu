@@ -450,7 +450,9 @@ void gemm_mma_sync_fp16(
         int b_col = blockIdx.x * TILE_WIDTH_WMMA;
 
         for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
-            Nds[j] = b[(b_row + j/TILE_WIDTH_WMMA) * n + (b_col + j % TILE_WIDTH_WMMA)];
+            int r1 = j/TILE_WIDTH_WMMA;
+            int c1 = j % TILE_WIDTH_WMMA;
+            Nds[c1*TILE_WIDTH_WMMA + r1] = b[(b_row + r1) * n + (b_col + c1)];
         }
 
         __syncthreads();
@@ -485,21 +487,21 @@ void gemm_mma_sync_fp16(
             );
 
             asm volatile(
-                "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
+                "ldmatrix.sync.aligned.m8n8.x2.shared.b16 "
                 "{%0, %1}, [%2];"
                 : "=r"(regs_b_1[0]), "=r"(regs_b_1[1])
                 : "r"(addr_b_1)
             );
 
             asm volatile(
-                "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
+                "ldmatrix.sync.aligned.m8n8.x2.shared.b16 "
                 "{%0, %1}, [%2];"
                 : "=r"(regs_b_2[0]), "=r"(regs_b_2[1])
                 : "r"(addr_b_2)
             );
 
             asm volatile(
-                "mma.sync.aligned.m16n8k16.row.row.f32.f16.f16.f32 "
+                "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
                 "{%0, %1, %2, %3}, "
                 "{%4, %5, %6, %7}, "
                 "{%8, %9}, "
@@ -509,7 +511,7 @@ void gemm_mma_sync_fp16(
             );
 
             asm volatile(
-                "mma.sync.aligned.m16n8k16.row.row.f32.f16.f16.f32 "
+                "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
                 "{%0, %1, %2, %3}, "
                 "{%4, %5, %6, %7}, "
                 "{%8, %9}, "
