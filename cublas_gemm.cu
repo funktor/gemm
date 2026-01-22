@@ -456,7 +456,7 @@ void gemm_mma_sync_fp16(
             int m_col = j;
 
             int n_row = j;
-            int n_col_1 = (idx/32) * 8;
+            int n_col_1 = 2*(idx/32) * 8;
             int n_col_2 = n_col_1 + 8;
             
             uint32_t regs_a[4];
