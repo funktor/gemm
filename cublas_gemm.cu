@@ -429,8 +429,8 @@ void gemm_mma_sync_fp16(
     const int n, 
     const int k
 ) {
-    __shared__ alignas(16) half Mds[TILE_WIDTH*TILE_WIDTH];
-    __shared__ alignas(16) half Nds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ alignas(16) half Mds[TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
+    __shared__ alignas(16) half Nds[TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
 
     int idx = threadIdx.y * blockDim.x + threadIdx.x;
 
@@ -438,24 +438,24 @@ void gemm_mma_sync_fp16(
     int warp_col_id = (idx % blockDim.x)/32;
     int thread_id_in_warp = idx % 32;
 
-    for (int i = 0; i < k; i += TILE_WIDTH) {
-        int a_row = blockIdx.y * TILE_WIDTH;
+    for (int i = 0; i < k; i += TILE_WIDTH_WMMA) {
+        int a_row = blockIdx.y * TILE_WIDTH_WMMA;
         int a_col = i;
 
-        for (int j = idx; j < TILE_WIDTH*TILE_WIDTH; j += blockDim.x * blockDim.y) {
-            Mds[j] = a[(a_row + j/TILE_WIDTH) * k + (a_col + j % TILE_WIDTH)];
+        for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
+            Mds[j] = a[(a_row + j/TILE_WIDTH_WMMA) * k + (a_col + j % TILE_WIDTH_WMMA)];
         }
 
         int b_row = i;
-        int b_col = blockIdx.x * TILE_WIDTH;
+        int b_col = blockIdx.x * TILE_WIDTH_WMMA;
 
-        for (int j = idx; j < TILE_WIDTH*TILE_WIDTH; j += blockDim.x * blockDim.y) {
-            Nds[j] = b[(b_row + j/TILE_WIDTH) * n + (b_col + j % TILE_WIDTH)];
+        for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
+            Nds[j] = b[(b_row + j/TILE_WIDTH_WMMA) * n + (b_col + j % TILE_WIDTH_WMMA)];
         }
 
         __syncthreads();
 
-        for (int j = 0; j < TILE_WIDTH; j += 16) {
+        for (int j = 0; j < TILE_WIDTH_WMMA; j += 16) {
             uint32_t regs_a[4];
 
             uint32_t regs_b_1[2];
@@ -471,9 +471,9 @@ void gemm_mma_sync_fp16(
             int n_col_1 = 2 * warp_col_id * 8;
             int n_col_2 = n_col_1 + 8;
 
-            uint32_t addr_a = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * TILE_WIDTH + (thread_id_in_warp/16) * 8 + m_col]);
-            uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH + n_col_1]);
-            uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH + n_col_2]);
+            uint32_t addr_a = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + (thread_id_in_warp/16) * 8 + m_col]);
+            uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + n_col_1]);
+            uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + n_col_2]);
 
             __syncthreads();
 
@@ -499,7 +499,7 @@ void gemm_mma_sync_fp16(
             );
 
             asm volatile(
-                "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+                "mma.sync.aligned.m16n8k16.row.row.f32.f16.f16.f32 "
                 "{%0, %1, %2, %3}, "
                 "{%4, %5, %6, %7}, "
                 "{%8, %9}, "
@@ -509,7 +509,7 @@ void gemm_mma_sync_fp16(
             );
 
             asm volatile(
-                "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+                "mma.sync.aligned.m16n8k16.row.row.f32.f16.f16.f32 "
                 "{%0, %1, %2, %3}, "
                 "{%4, %5, %6, %7}, "
                 "{%8, %9}, "
@@ -782,7 +782,7 @@ int main(){
     for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16[i] = 0.0f;
 
     dim3 bd6(128, 4, 1);
-    dim3 gd6((n+TILE_WIDTH-1)/TILE_WIDTH, (m+TILE_WIDTH-1)/TILE_WIDTH, 1);
+    dim3 gd6((n+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, (m+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_mma_sync_fp16<<<gd6, bd6>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16, 1.0, 0.0, m, n, k);
