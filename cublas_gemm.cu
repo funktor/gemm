@@ -586,8 +586,8 @@ void gemm_mma_sync_fp16(
 
 __global__ 
 void gemm_mma_sync_fp16_vectorized(
-    const half *a, 
-    const half *b, 
+    half *a, 
+    half *b, 
     float *c, 
     const float alpha, 
     const float beta, 
@@ -647,9 +647,9 @@ void gemm_mma_sync_fp16_vectorized(
                         int n_col_1 = b0_col + c1;
                         int n_col_2 = n_col_1 + 8;
 
-                        uint4 addr_a = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + (thread_id_in_warp/16) * 8 + m_col]);
-                        uint4 addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + n_col_1]);
-                        uint4 addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + n_col_2]);
+                        uint4 addr_a = reinterpret_cast<uint4*> __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + (thread_id_in_warp/16) * 8 + m_col]);
+                        uint4 addr_b_1 = reinterpret_cast<uint4*> __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + n_col_1]);
+                        uint4 addr_b_2 = reinterpret_cast<uint4*> __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + n_col_2]);
 
                         __syncthreads();
 
@@ -925,11 +925,11 @@ int main(){
 
     for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_vec[i] = 0.0f;
 
-    dim3 bd6(64, 2, 1);
-    dim3 gd6((n+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, (m+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, 1);
+    dim3 bd7(64, 2, 1);
+    dim3 gd7((n+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, (m+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_mma_sync_fp16_vectorized<<<gd6, bd6>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16_vec, 1.0, 0.0, m, n, k);
+    gemm_mma_sync_fp16_vectorized<<<gd7, bd7>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16_vec, 1.0, 0.0, m, n, k);
     cudaDeviceSynchronize();
     cudaErrCheck(cudaEventRecord(stopcublas));
     cudaErrCheck(cudaEventSynchronize(stopcublas));
