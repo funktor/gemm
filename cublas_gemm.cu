@@ -609,14 +609,14 @@ void gemm_mma_sync_fp16_vectorized(
         int a_col = i;
 
         for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA/4; j += blockDim.x * blockDim.y) {
-            reinterpret_cast<float4 *>(&Mds[j*4])[0] = reinterpret_cast<float4 *>(&a[(a_row + (j*4)/TILE_WIDTH_WMMA) * k + (a_col + (j*4) % TILE_WIDTH_WMMA)])[0];
+            reinterpret_cast<half4 *>(&Mds[j*4])[0] = reinterpret_cast<half4 *>(&a[(a_row + (j*4)/TILE_WIDTH_WMMA) * k + (a_col + (j*4) % TILE_WIDTH_WMMA)])[0];
         }
 
         int b_row = i;
         int b_col = blockIdx.x * TILE_WIDTH_WMMA;
 
         for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA/4; j += blockDim.x * blockDim.y) {
-            reinterpret_cast<float4 *>(&Nds[j*4])[0] = reinterpret_cast<float4 *>(&b[(b_row + (j*4)/TILE_WIDTH_WMMA) * n + (b_col + (j*4) % TILE_WIDTH_WMMA)])[0];
+            reinterpret_cast<half4 *>(&Nds[j*4])[0] = reinterpret_cast<half4 *>(&b[(b_row + (j*4)/TILE_WIDTH_WMMA) * n + (b_col + (j*4) % TILE_WIDTH_WMMA)])[0];
         }
 
         __syncthreads();

@@ -13,6 +13,7 @@
 #include <curand.h>
 #include <cublas_v2.h>
 #include <mma.h>
+#include <cuda_fp16.h>
 
 void generate_data(float *x, const long n);
 
