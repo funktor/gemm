@@ -647,9 +647,9 @@ void gemm_mma_sync_fp16_vectorized(
                         int n_col_1 = b0_col + c1;
                         int n_col_2 = n_col_1 + 8;
 
-                        uint4 *addr_a = reinterpret_cast<uint4*> (__cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + (thread_id_in_warp/16) * 8 + m_col]));
-                        uint4 *addr_b_1 = reinterpret_cast<uint4*> (__cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + n_col_1]));
-                        uint4 *addr_b_2 = reinterpret_cast<uint4*> (__cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + n_col_2]));
+                        uint4 addr_a = reinterpret_cast<uint4> (__cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + (thread_id_in_warp/16) * 8 + m_col]));
+                        uint4 addr_b_1 = reinterpret_cast<uint4> (__cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + n_col_1]));
+                        uint4 addr_b_2 = reinterpret_cast<uint4> (__cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + n_col_2]));
 
                         __syncthreads();
 
