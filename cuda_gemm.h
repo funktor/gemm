@@ -15,6 +15,11 @@
 #include <mma.h>
 #include <cuda_fp16.h>
 
+struct __align__(8) half4 {
+    half2 a;
+    half2 b;
+};
+
 void generate_data(float *x, const long n);
 
 void gemm_cpu(
