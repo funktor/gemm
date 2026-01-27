@@ -814,7 +814,7 @@ void gemm_mma_sync_fp16_swizzled(
                         c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
                     }
                 }
-                __syncwarp();
+                __syncthreads();
             }
         }
     }
