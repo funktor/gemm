@@ -604,14 +604,14 @@ void gemm_mma_sync_fp16_vectorized(
     int warp_col_id = (idx % blockDim.x)/32;
     int thread_id_in_warp = idx % 32;
 
-    for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < 2; j++) {
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
             for (int k1 = 0; k1 < k; k1 += 64) {
-                int a_row = (2 * blockIdx.y + i) * 64;
+                int a_row = (4 * blockIdx.y + i) * 64;
                 int a_col = k1;
 
                 int b_row = k1;
-                int b_col = (2 * blockIdx.x + j) * 64;
+                int b_col = (4 * blockIdx.x + j) * 64;
 
                 for (int j = idx; j < 64*64; j += blockDim.x * blockDim.y) {
                     int row = j/64;
@@ -1155,7 +1155,7 @@ int main(){
     for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_vec[i] = 0.0f;
 
     dim3 bd7(128, 4, 1);
-    dim3 gd7((n+128-1)/128, (m+128-1)/128, 1);
+    dim3 gd7((n+256-1)/256, (m+256-1)/256, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_mma_sync_fp16_vectorized<<<gd7, bd7>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16_vec, 1.0, 0.0, m, n, k);
