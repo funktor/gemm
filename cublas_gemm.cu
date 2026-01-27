@@ -1161,7 +1161,7 @@ int main(){
 
     for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_vec[i] = 0.0f;
 
-    dim3 bd7(64, 2, 1);
+    dim3 bd7(64, 4, 1);
     dim3 gd7((n+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, (m+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
