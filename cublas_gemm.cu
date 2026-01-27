@@ -595,11 +595,6 @@ void gemm_mma_sync_fp16_vectorized(
     const int n, 
     const int k
 ) {
-    __shared__ alignas(16) half Mds[32*32];
-    __shared__ alignas(16) half Nds[32*32];
-
-    int idx = threadIdx.y * blockDim.x + threadIdx.x;
-
     int warp_row_id = idx/blockDim.x;
     int warp_col_id = (idx % blockDim.x)/32;
     int thread_id_in_warp = idx % 32;
@@ -617,6 +612,11 @@ void gemm_mma_sync_fp16_vectorized(
 
             int b0_row = j;
             int b0_col = warp_col_id * 32;
+
+            __shared__ alignas(16) half Mds[32*32];
+            __shared__ alignas(16) half Nds[32*32];
+
+            int idx = threadIdx.y * blockDim.x + threadIdx.x;
 
             for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
                 int row = j1/32;
@@ -1161,7 +1161,7 @@ int main(){
 
     for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_vec[i] = 0.0f;
 
-    dim3 bd7(64, 4, 1);
+    dim3 bd7(64, 2, 1);
     dim3 gd7((n+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, (m+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
