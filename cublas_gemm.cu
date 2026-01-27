@@ -805,9 +805,9 @@ void gemm_mma_sync_fp16_swizzled(
 
                         __syncthreads();
 
-                        const int *a_regs = (const int *)a_tile;
-                        const int *b_regs_1 = (const int *)b_tile_1;
-                        const int *b_regs_2 = (const int *)b_tile_2;
+                        const int *regs_a = (const int *)a_tile;
+                        const int *regs_b_1 = (const int *)b_tile_1;
+                        const int *regs_b_2 = (const int *)b_tile_2;
 
                         // uint32_t addr_a   = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + (thread_id_in_warp/16) * 8 + m_col]);
                         // uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * TILE_WIDTH_WMMA + n_col_1]);
