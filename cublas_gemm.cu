@@ -782,11 +782,11 @@ void gemm_mma_sync_fp16_swizzled(
                         b_tile_2[q] = Nds[(n_row + row)*64 + n_col_2 + s_col];
                     }
 
+                    __syncwarp();
+
                     const int *regs_a = (const int *)a_tile;
                     const int *regs_b_1 = (const int *)b_tile_1;
                     const int *regs_b_2 = (const int *)b_tile_2;
-
-                    __syncwarp();
 
                     asm volatile(
                         "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
@@ -816,7 +816,7 @@ void gemm_mma_sync_fp16_swizzled(
                         c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
                     }
                 }
-                // __syncthreads();
+                __syncthreads();
             }
         }
     }
