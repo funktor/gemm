@@ -595,6 +595,8 @@ void gemm_mma_sync_fp16_vectorized(
     const int n, 
     const int k
 ) {
+    int idx = threadIdx.y * blockDim.x + threadIdx.x;
+
     int warp_row_id = idx/blockDim.x;
     int warp_col_id = (idx % blockDim.x)/32;
     int thread_id_in_warp = idx % 32;
@@ -615,8 +617,6 @@ void gemm_mma_sync_fp16_vectorized(
 
             __shared__ alignas(16) half Mds[32*32];
             __shared__ alignas(16) half Nds[32*32];
-
-            int idx = threadIdx.y * blockDim.x + threadIdx.x;
 
             for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
                 int row = j1/32;
