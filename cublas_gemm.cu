@@ -654,8 +654,6 @@ void gemm_mma_sync_fp16_vectorized(
                         uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 32 + n_col_1]);
                         uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 32 + n_col_2]);
 
-                        __syncthreads();
-
                         asm volatile(
                             "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
                             "{%0, %1, %2, %3}, [%4];"
@@ -707,6 +705,8 @@ void gemm_mma_sync_fp16_vectorized(
                     }
                 }
             }
+
+            __syncthreads();
         }
     }
 
