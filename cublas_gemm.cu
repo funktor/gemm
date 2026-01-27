@@ -751,49 +751,38 @@ void gemm_mma_sync_fp16_swizzled(
                 __syncthreads();
 
                 for (int k2 = 0; k2 < 64; k2 += 16) {
-                    uint32_t regs_a[4];
-
-                    uint32_t regs_b_1[2];
-                    uint32_t regs_b_2[2];
+                    half a_tile[8] = {};
+                    half b_tile_1[4] = {};
+                    half b_tile_2[4] = {};
 
                     float regs_c_1[4] = {0.0f};
                     float regs_c_2[4] = {0.0f};
 
                     int m_row = warp_row_id * 16;
                     int m_col = k2;
-                    int sm_col = (m_col/8)*8 + (m_row % 8)^(m_col % 8);
 
                     int n_row = k2;
                     int n_col_1 = warp_col_id * 16;
                     int n_col_2 = n_col_1 + 8;
 
-                    int sn_col_1 = (n_col_1/8)*8 + (n_row % 8)^(n_col_1 % 8);
-                    int sn_col_2 = sn_col_1 + 8;
+                    for (int q = 0; q < 8; q++) {
+                        int row = (thread_id_in_warp >> 2) + 8 * ((q / 2) % 2);
+                        int col = 2 * (thread_id_in_warp % 4) + (q % 2) + 8 * (q / 4);
+                        int s_col = (col/8)*8 + (row % 8) ^ (col % 8);
+                        a_tile[q] = Mds[(m_row + row)*64 + m_col + s_col];
+                    }
 
-                    uint32_t addr_a   = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * 64 + (thread_id_in_warp/16) * 8 + sm_col]);
-                    uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 64 + sn_col_1]);
-                    uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 64 + sn_col_2]);
+                    for (int q = 0; q < 4; q++) {
+                        int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
+                        int col = thread_id_in_warp >> 2;
+                        int s_col = (col/8)*8 + (row % 8) ^ (col % 8);
+                        b_tile_1[q] = Nds[(n_row + row)*64 + n_col_1 + s_col];
+                        b_tile_2[q] = Nds[(n_row + row)*64 + n_col_2 + s_col];
+                    }
 
-                    asm volatile(
-                        "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
-                        "{%0, %1, %2, %3}, [%4];"
-                        : "=r"(regs_a[0]), "=r"(regs_a[1]), "=r"(regs_a[2]), "=r"(regs_a[3])
-                        : "r"(addr_a)
-                    );
-
-                    asm volatile(
-                        "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
-                        "{%0, %1}, [%2];"
-                        : "=r"(regs_b_1[0]), "=r"(regs_b_1[1])
-                        : "r"(addr_b_1)
-                    );
-
-                    asm volatile(
-                        "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
-                        "{%0, %1}, [%2];"
-                        : "=r"(regs_b_2[0]), "=r"(regs_b_2[1])
-                        : "r"(addr_b_2)
-                    );
+                    const int *regs_a = (const int *)a_tile;
+                    const int *regs_b_1 = (const int *)b_tile_1;
+                    const int *regs_b_2 = (const int *)b_tile_2;
 
                     asm volatile(
                         "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
@@ -822,69 +811,6 @@ void gemm_mma_sync_fp16_swizzled(
                         c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[q];
                         c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
                     }
-
-
-
-                    // half a_tile[8] = {};
-                    // half b_tile_1[4] = {};
-                    // half b_tile_2[4] = {};
-
-                    // float regs_c_1[4] = {0.0f};
-                    // float regs_c_2[4] = {0.0f};
-
-                    // int m_row = warp_row_id * 16;
-                    // int m_col = k2;
-
-                    // int n_row = k2;
-                    // int n_col_1 = warp_col_id * 16;
-                    // int n_col_2 = n_col_1 + 8;
-
-                    // for (int q = 0; q < 8; q++) {
-                    //     int row = (thread_id_in_warp >> 2) + 8 * ((q / 2) % 2);
-                    //     int col = 2 * (thread_id_in_warp % 4) + (q % 2) + 8 * (q / 4);
-                    //     int s_col = (col/8)*8 + (row % 8) ^ (col % 8);
-                    //     a_tile[q] = Mds[(m_row + row)*64 + m_col + s_col];
-                    // }
-
-                    // for (int q = 0; q < 4; q++) {
-                    //     int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
-                    //     int col = thread_id_in_warp >> 2;
-                    //     int s_col = (col/8)*8 + (row % 8) ^ (col % 8);
-                    //     b_tile_1[q] = Nds[(n_row + row)*64 + n_col_1 + s_col];
-                    //     b_tile_2[q] = Nds[(n_row + row)*64 + n_col_2 + s_col];
-                    // }
-
-                    // const int *regs_a = (const int *)a_tile;
-                    // const int *regs_b_1 = (const int *)b_tile_1;
-                    // const int *regs_b_2 = (const int *)b_tile_2;
-
-                    // asm volatile(
-                    //     "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
-                    //     "{%0, %1, %2, %3}, "
-                    //     "{%4, %5, %6, %7}, "
-                    //     "{%8, %9}, "
-                    //     "{%0, %1, %2, %3};\n"
-                    //     : "+f"(regs_c_1[0]), "+f"(regs_c_1[1]), "+f"(regs_c_1[2]),"+f"(regs_c_1[3])
-                    //     : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_1[0]), "r"(regs_b_1[1])
-                    // );
-
-                    // asm volatile(
-                    //     "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
-                    //     "{%0, %1, %2, %3}, "
-                    //     "{%4, %5, %6, %7}, "
-                    //     "{%8, %9}, "
-                    //     "{%0, %1, %2, %3};\n"
-                    //     : "+f"(regs_c_2[0]), "+f"(regs_c_2[1]), "+f"(regs_c_2[2]),"+f"(regs_c_2[3])
-                    //     : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_2[0]), "r"(regs_b_2[1])
-                    // );
-
-                    // #pragma unroll
-                    // for (int q = 0; q < 4; q++) {
-                    //     int rw = (thread_id_in_warp >> 2) + 8 * (q / 2);
-                    //     int cl = 2 * (thread_id_in_warp % 4) + (q % 2);
-                    //     c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[q];
-                    //     c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
-                    // }
                 }
                 __syncthreads();
             }
