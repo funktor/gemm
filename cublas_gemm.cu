@@ -624,7 +624,7 @@ void gemm_mma_sync_fp16_vectorized(
             int col = j % TILE_WIDTH_WMMA;
             int s_col = (row >> 3)*8 + (row % 8)^(col % 8);
 
-            Nds[row*TILE_WIDTH_WMMA + s_col] = a[(b_row + row) * n + (b_col + col)];
+            Nds[row*TILE_WIDTH_WMMA + s_col] = b[(b_row + row) * n + (b_col + col)];
         }
 
         __syncthreads();
