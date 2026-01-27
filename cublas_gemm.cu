@@ -611,9 +611,9 @@ void gemm_mma_sync_fp16_vectorized(
         for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
             int row = j/TILE_WIDTH_WMMA;
             int col = j % TILE_WIDTH_WMMA;
-            int s_col = (col >> 3)*8 + (row % 8)^(col % 8);
+            // int s_col = (col >> 3)*8 + (row % 8)^(col % 8);
 
-            Mds[row*TILE_WIDTH_WMMA + s_col] = a[(a_row + row) * k + (a_col + col)];
+            Mds[row*TILE_WIDTH_WMMA + col] = a[(a_row + row) * k + (a_col + col)];
         }
 
         int b_row = i;
@@ -622,9 +622,9 @@ void gemm_mma_sync_fp16_vectorized(
         for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
             int row = j/TILE_WIDTH_WMMA;
             int col = j % TILE_WIDTH_WMMA;
-            int s_col = (col >> 3)*8 + (row % 8)^(col % 8);
+            // int s_col = (col >> 3)*8 + (row % 8)^(col % 8);
 
-            Nds[s_col*TILE_WIDTH_WMMA + row] = b[(b_row + row) * n + (b_col + col)];
+            Nds[row*TILE_WIDTH_WMMA + col] = b[(b_row + row) * n + (b_col + col)];
         }
 
         __syncthreads();
