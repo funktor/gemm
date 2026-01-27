@@ -786,6 +786,8 @@ void gemm_mma_sync_fp16_swizzled(
                     const int *regs_b_1 = (const int *)b_tile_1;
                     const int *regs_b_2 = (const int *)b_tile_2;
 
+                    __syncwarp();
+
                     asm volatile(
                         "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
                         "{%0, %1, %2, %3}, "
