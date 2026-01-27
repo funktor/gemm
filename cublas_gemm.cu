@@ -624,7 +624,7 @@ void gemm_mma_sync_fp16_vectorized(
             int col = j % TILE_WIDTH_WMMA;
             int s_col = (row >> 3)*8 + (row % 8)^(col % 8);
 
-            Nds[row*TILE_WIDTH_WMMA + s_col] = b[(b_row + row) * n + (b_col + col)];
+            Nds[s_col*TILE_WIDTH_WMMA + row] = b[(b_row + row) * n + (b_col + col)];
         }
 
         __syncthreads();
@@ -669,14 +669,14 @@ void gemm_mma_sync_fp16_vectorized(
                         );
 
                         asm volatile(
-                            "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
+                            "ldmatrix.sync.aligned.m8n8.x2.shared.b16 "
                             "{%0, %1}, [%2];"
                             : "=r"(regs_b_1[0]), "=r"(regs_b_1[1])
                             : "r"(addr_b_1)
                         );
 
                         asm volatile(
-                            "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
+                            "ldmatrix.sync.aligned.m8n8.x2.shared.b16 "
                             "{%0, %1}, [%2];"
                             : "=r"(regs_b_2[0]), "=r"(regs_b_2[1])
                             : "r"(addr_b_2)
