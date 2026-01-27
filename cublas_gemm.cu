@@ -595,8 +595,8 @@ void gemm_mma_sync_fp16_vectorized(
     const int n, 
     const int k
 ) {
-    __shared__ alignas(16) half Mds[TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
-    __shared__ alignas(16) half Nds[TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
+    __shared__ alignas(16) half Mds[32*32];
+    __shared__ alignas(16) half Nds[32*32];
 
     int idx = threadIdx.y * blockDim.x + threadIdx.x;
 
