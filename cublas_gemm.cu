@@ -1150,7 +1150,7 @@ int main(){
     for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_vec[i] = 0.0f;
 
     dim3 bd7(64, 2, 1);
-    dim3 gd7((n+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, (m+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, 1);
+    dim3 gd7((n+32-1)/32, (m+32-1)/32, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
     gemm_mma_sync_fp16_vectorized<<<gd7, bd7>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16_vec, 1.0, 0.0, m, n, k);
