@@ -20,6 +20,45 @@ struct __align__(8) half4 {
     half2 b;
 };
 
+template <typename T> struct Afrag_16x16 {
+  static constexpr size_t ne = 8; // num of elements per thread
+
+  T x[ne];
+
+  static __device__ size_t get_row(int tid, int l) {
+    int group_id = tid >> 2;
+    return group_id + 8 * ((l / 2) % 2);
+  }
+
+  static __device__ size_t get_col(int tid, int l) {
+    return 2 * (tid % 4) + (l % 2) + 8 * (l / 4);
+  }
+};
+
+template <typename T> struct Bfrag_16x8 {
+  static constexpr size_t ne = 4;
+  T x[ne] = {};
+  static __device__ size_t get_row(int tid, int l) {
+    return (tid % 4) * 2 + (l % 2) + 8 * (l / 2);
+  }
+
+  static __device__ size_t get_col(int tid, int l) { return tid >> 2; }
+};
+
+template <typename T> struct CFrag_16x8 {
+  static constexpr size_t ne = 4;
+  T x[ne] = {};
+
+  static __device__ size_t get_row(int tid, int l) {
+    return (tid >> 2) + 8 * (l / 2);
+  }
+
+  static __device__ size_t get_col(int tid, int l) {
+    assert(l < ne);
+    return 2 * (tid % 4) + (l % 2);
+  }
+};
+
 void generate_data(float *x, const long n);
 
 void gemm_cpu(
