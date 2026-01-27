@@ -740,7 +740,7 @@ void gemm_mma_sync_fp16_swizzled(
         for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
             int row = j/TILE_WIDTH_WMMA;
             int col = j % TILE_WIDTH_WMMA;
-            int s_col = (col >> 3)*8 + (row % 8)^(col % 8);
+            int s_col = (col/8)*8 + (row % 8)^(col % 8);
 
             Mds[row*TILE_WIDTH_WMMA + s_col] = a[(a_row + row) * k + (a_col + col)];
         }
@@ -751,7 +751,7 @@ void gemm_mma_sync_fp16_swizzled(
         for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
             int row = j/TILE_WIDTH_WMMA;
             int col = j % TILE_WIDTH_WMMA;
-            int s_col = (col >> 3)*8 + (row % 8)^(col % 8);
+            int s_col = (col/8)*8 + (row % 8)^(col % 8);
 
             Nds[row*TILE_WIDTH_WMMA + s_col] = b[(b_row + row) * n + (b_col + col)];
         }
@@ -791,14 +791,14 @@ void gemm_mma_sync_fp16_swizzled(
                         for (int q = 0; q < 8; q++) {
                             int row = (thread_id_in_warp >> 2) + 8 * ((q / 2) % 2);
                             int col = 2 * (thread_id_in_warp % 4) + (q % 2) + 8 * (q / 4);
-                            int s_col = row ^ col;
+                            int s_col = (col/8)*8 + (row % 8) ^ (col % 8);
                             a_tile[q] = Mds[(m_row + row)*TILE_WIDTH_WMMA + m_col + s_col];
                         }
 
                         for (int q = 0; q < 4; q++) {
                             int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
                             int col = thread_id_in_warp >> 2;
-                            int s_col = row ^ col;
+                            int s_col = (col/8)*8 + (row % 8) ^ (col % 8);
                             b_tile_1[q] = Nds[(n_row + row)*TILE_WIDTH_WMMA + n_col_1 + s_col];
                             b_tile_2[q] = Nds[(n_row + row)*TILE_WIDTH_WMMA + n_col_2 + s_col];
                         }
