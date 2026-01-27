@@ -768,7 +768,7 @@ void gemm_mma_sync_fp16_swizzled(
                     int n_col_2 = n_col_1 + 8;
 
                     int sn_col_1 = (n_col_1/8)*8 + (n_row % 8)^(n_col_1 % 8);
-                    int sn_col_2 = (n_col_2/8)*8 + (n_row % 8)^(n_col_2 % 8);
+                    int sn_col_2 = sn_col_1 + 8;
 
                     uint32_t addr_a   = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * 64 + (thread_id_in_warp/16) * 8 + sm_col]);
                     uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 64 + sn_col_1]);
