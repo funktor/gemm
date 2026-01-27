@@ -605,11 +605,11 @@ void gemm_mma_sync_fp16_vectorized(
     int thread_id_in_warp = idx % 32;
 
     for (int i = 0; i < k; i += 32) {
-        int a_row = blockIdx.y * TILE_WIDTH_WMMA;
+        int a_row = blockIdx.y * 32;
         int a_col = i;
 
         int b_row = i;
-        int b_col = blockIdx.x * TILE_WIDTH_WMMA;
+        int b_col = blockIdx.x * 32;
 
         for (int j = idx; j < 32*32; j += blockDim.x * blockDim.y) {
             int row = j/32;
