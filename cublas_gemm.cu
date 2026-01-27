@@ -613,16 +613,16 @@ void gemm_mma_sync_fp16_vectorized(
                 int b_row = k1;
                 int b_col = (4 * blockIdx.x + j) * 64;
 
-                for (int j = idx; j < 64*64; j += blockDim.x * blockDim.y) {
-                    int row = j/64;
-                    int col = j % 64;
-                    Mds[j] = a[(a_row + row) * k + (a_col + col)];
+                for (int j1 = idx; j1 < 64*64; j1 += blockDim.x * blockDim.y) {
+                    int row = j1/64;
+                    int col = j1 % 64;
+                    Mds[j1] = a[(a_row + row) * k + (a_col + col)];
                 }
 
-                for (int j = idx; j < 64*64; j += blockDim.x * blockDim.y) {
-                    int row = j/64;
-                    int col = j % 64;
-                    Nds[j] = b[(b_row + row) * n + (b_col + col)];
+                for (int j1 = idx; j1 < 64*64; j1 += blockDim.x * blockDim.y) {
+                    int row = j1/64;
+                    int col = j1 % 64;
+                    Nds[j1] = b[(b_row + row) * n + (b_col + col)];
                 }
 
                 __syncthreads();
@@ -732,17 +732,17 @@ void gemm_mma_sync_fp16_swizzled(
                 int b_row = k1;
                 int b_col = (4 * blockIdx.x + j) * 64;
 
-                for (int j = idx; j < 64*64; j += blockDim.x * blockDim.y) {
-                    int row = j/64;
-                    int col = j % 64;
+                for (int j1 = idx; j1 < 64*64; j1 += blockDim.x * blockDim.y) {
+                    int row = j1/64;
+                    int col = j1 % 64;
                     int s_col = (col/8)*8 + (row % 8)^(col % 8);
 
                     Mds[row*64 + s_col] = a[(a_row + row) * k + (a_col + col)];
                 }
 
-                for (int j = idx; j < 64*64; j += blockDim.x * blockDim.y) {
-                    int row = j/64;
-                    int col = j % 64;
+                for (int j1 = idx; j1 < 64*64; j1 += blockDim.x * blockDim.y) {
+                    int row = j1/64;
+                    int col = j1 % 64;
                     int s_col = (col/8)*8 + (row % 8)^(col % 8);
 
                     Nds[row*64 + s_col] = b[(b_row + row) * n + (b_col + col)];
