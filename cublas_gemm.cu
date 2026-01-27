@@ -595,8 +595,8 @@ void gemm_mma_sync_fp16_vectorized(
     const int n, 
     const int k
 ) {
-    __shared__ alignas(16) half Mds[64*65];
-    __shared__ alignas(16) half Nds[64*65];
+    __shared__ alignas(16) half Mds[64*64];
+    __shared__ alignas(16) half Nds[64*64];
 
     int idx = threadIdx.y * blockDim.x + threadIdx.x;
 
@@ -606,28 +606,28 @@ void gemm_mma_sync_fp16_vectorized(
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
-            for (int k1 = 0; k1 < k; k1 += 65) {
+            for (int k1 = 0; k1 < k; k1 += 64) {
                 int a_row = (4 * blockIdx.y + i) * 64;
                 int a_col = k1;
 
                 int b_row = k1;
-                int b_col = (4 * blockIdx.x + j) * 65;
+                int b_col = (4 * blockIdx.x + j) * 64;
 
-                for (int j = idx; j < 64*65; j += blockDim.x * blockDim.y) {
-                    int row = j/65;
-                    int col = j % 65;
+                for (int j = idx; j < 64*64; j += blockDim.x * blockDim.y) {
+                    int row = j/64;
+                    int col = j % 64;
                     Mds[j] = a[(a_row + row) * k + (a_col + col)];
                 }
 
-                for (int j = idx; j < 64*65; j += blockDim.x * blockDim.y) {
-                    int row = j/65;
-                    int col = j % 65;
+                for (int j = idx; j < 64*64; j += blockDim.x * blockDim.y) {
+                    int row = j/64;
+                    int col = j % 64;
                     Nds[j] = b[(b_row + row) * n + (b_col + col)];
                 }
 
                 __syncthreads();
 
-                for (int k2 = 0; k2 < 65; k2 += 16) {
+                for (int k2 = 0; k2 < 64; k2 += 16) {
                     uint32_t regs_a[4];
 
                     uint32_t regs_b_1[2];
@@ -643,9 +643,9 @@ void gemm_mma_sync_fp16_vectorized(
                     int n_col_1 = warp_col_id * 16;
                     int n_col_2 = n_col_1 + 8;
 
-                    uint32_t addr_a   = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * 65 + (thread_id_in_warp/16) * 8 + m_col]);
-                    uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 65 + n_col_1]);
-                    uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 65 + n_col_2]);
+                    uint32_t addr_a   = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * 64 + (thread_id_in_warp/16) * 8 + m_col]);
+                    uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 64 + n_col_1]);
+                    uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 64 + n_col_2]);
 
                     asm volatile(
                         "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
@@ -765,17 +765,19 @@ void gemm_mma_sync_fp16_swizzled(
                     int n_col_1 = warp_col_id * 16;
                     int n_col_2 = n_col_1 + 8;
 
+                    #pragma unroll
                     for (int q = 0; q < 8; q++) {
                         int row = (thread_id_in_warp >> 2) + 8 * ((q / 2) % 2);
                         int col = 2 * (thread_id_in_warp % 4) + (q % 2) + 8 * (q / 4);
-                        int s_col = (col/8)*8 + (row % 8) ^ (col % 8);
+                        int s_col = (col >> 3)*8 + (row % 8) ^ (col % 8);
                         a_tile[q] = Mds[(m_row + row)*64 + m_col + s_col];
                     }
 
+                    #pragma unroll
                     for (int q = 0; q < 4; q++) {
                         int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
                         int col = thread_id_in_warp >> 2;
-                        int s_col = (col/8)*8 + (row % 8) ^ (col % 8);
+                        int s_col = (col >> 3)*8 + (row % 8) ^ (col % 8);
                         b_tile_1[q] = Nds[(n_row + row)*64 + n_col_1 + s_col];
                         b_tile_2[q] = Nds[(n_row + row)*64 + n_col_2 + s_col];
                     }
@@ -812,7 +814,7 @@ void gemm_mma_sync_fp16_swizzled(
                         c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
                     }
                 }
-                __syncthreads();
+                // __syncthreads();
             }
         }
     }

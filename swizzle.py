@@ -15,4 +15,4 @@ def swizzle(n, m, k):
 
 
 
-swizzle(32, 32, 8)
+swizzle(32, 32, 16)
