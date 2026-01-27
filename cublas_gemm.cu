@@ -640,7 +640,7 @@ void gemm_mma_sync_fp16_vectorized(
                         half b_tile_1[4] = {};
                         half b_tile_2[4] = {};
 
-                        uint32_t regs_a[4];
+                        // uint32_t regs_a[4];
 
                         // uint32_t regs_b_1[2];
                         // uint32_t regs_b_2[2];
@@ -796,7 +796,7 @@ void gemm_mma_sync_fp16_swizzled(
                         half b_tile_1[4] = {};
                         half b_tile_2[4] = {};
 
-                        uint32_t regs_a[4];
+                        // uint32_t regs_a[4];
 
                         // uint32_t regs_b_1[2];
                         // uint32_t regs_b_2[2];
