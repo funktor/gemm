@@ -618,16 +618,16 @@ void gemm_mma_sync_fp16_vectorized(
             int b0_row = j;
             int b0_col = warp_col_id * 32;
 
-            for (int j = idx; j < 32*32; j += blockDim.x * blockDim.y) {
-                int row = j/32;
-                int col = j % 32;
-                Mds[j] = a[(a_row + a0_row + row) * k + (a_col + a0_col + col)];
+            for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
+                int row = j1/32;
+                int col = j1 % 32;
+                Mds[j1] = a[(a_row + a0_row + row) * k + (a_col + a0_col + col)];
             }
 
-            for (int j = idx; j < 32*32; j += blockDim.x * blockDim.y) {
-                int row = j/32;
-                int col = j % 32;
-                Nds[j] = b[(b_row + b0_row + row) * n + (b_col + b0_col + col)];
+            for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
+                int row = j1/32;
+                int col = j1 % 32;
+                Nds[j1] = b[(b_row + b0_row + row) * n + (b_col + b0_col + col)];
             }
 
             __syncthreads();
