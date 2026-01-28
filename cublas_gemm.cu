@@ -745,7 +745,7 @@ void gemm_mma_sync_fp16_swizzled(
                     int col = j1 % 64;
                     int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                    Nds[s_col*64 + row] = b[(b_row + row) * n + (b_col + col)];
+                    Nds[row*64 + s_col] = b[(b_row + row) * n + (b_col + col)];
                 }
 
                 __syncthreads();
