@@ -818,8 +818,8 @@ void gemm_mma_sync_fp16_swizzled(
                     for (int q = 0; q < 4; q++) {
                         int rw = (thread_id_in_warp >> 2) + 8 * (q / 2);
                         int cl = 2 * (thread_id_in_warp % 4) + (q % 2);
-                        c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[q];
-                        c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
+                        c[(a_row + m_row + rw) * n + (b_col + n_row_1 + cl)] += regs_c_1[q];
+                        c[(a_row + m_row + rw) * n + (b_col + n_row_2 + cl)] += regs_c_2[q];
                     }
                 }
                 __syncthreads();
