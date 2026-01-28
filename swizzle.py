@@ -16,6 +16,18 @@ def swizzle(n, m, k, u):
         print(h)
     
     print()
+
+    f = []
+    for i in range(n):
+        g = []
+        for j in range(m):
+            g += [int(j/k)*k + (u*(int((i%k)/u)^(j%k)) + ((i%k)%u)) % k]
+        f += [g]
+
+        h = " ".join([str(x) for x in g])
+        print(h)
+    
+    print()
     
     for i in range(n):
         g = []
