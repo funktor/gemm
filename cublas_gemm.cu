@@ -761,9 +761,9 @@ void gemm_mma_sync_fp16_swizzled(
                     int m_row = warp_row_id * 16;
                     int m_col = k2;
 
-                    int n_row = k2;
-                    int n_col_1 = warp_col_id * 16;
-                    int n_col_2 = n_col_1 + 8;
+                    int n_row_1 = warp_col_id * 16;
+                    int n_row_2 = n_row_1 + 8;
+                    int n_col = k2;
 
                     #pragma unroll
                     for (int q = 0; q < 8; q += 2) {
@@ -779,13 +779,13 @@ void gemm_mma_sync_fp16_swizzled(
                     for (int q = 0; q < 4; q += 2) {
                         int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
                         int col = thread_id_in_warp >> 2;
-                        int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
+                        int s_row = (row/8)*8 + (2*((col % 8)^((col % 8)/2)) + ((row % 8) % 2)) % 8;
 
-                        b_tile_1[q] = Nds[(n_col_1 + s_col)*64 + n_row + row];
-                        b_tile_1[q+1] = Nds[(n_col_1 + s_col + 1)*64 + n_row + row];
+                        b_tile_1[q] = Nds[(n_row_1 + s_row)*64 + n_col + col];
+                        b_tile_1[q+1] = Nds[(n_row_1 + s_row + 1)*64 + n_col + col];
 
-                        b_tile_2[q] = Nds[(n_col_2 + s_col)*64 + n_row + row];
-                        b_tile_2[q+1] = Nds[(n_col_2 + s_col + 1)*64 + n_row + row];
+                        b_tile_2[q] = Nds[(n_row_2 + s_row)*64 + n_col + col];
+                        b_tile_2[q+1] = Nds[(n_row_2 + s_row + 1)*64 + n_col + col];
                     }
 
                     __syncwarp();
