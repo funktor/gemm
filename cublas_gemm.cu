@@ -745,7 +745,7 @@ void gemm_mma_sync_fp16_swizzled(
                     int col = j1 % 64;
                     int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                    Nds[row*64 + s_col] = b[(b_row + row) * n + (b_col + col)];
+                    Nds[s_col*64 + row] = b[(b_row + row) * n + (b_col + col)];
                 }
 
                 __syncthreads();
@@ -782,10 +782,10 @@ void gemm_mma_sync_fp16_swizzled(
                         int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
                         b_tile_1[q] = Nds[(n_row + row)*64 + n_col_1 + s_col];
-                        b_tile_1[q+1] = Nds[(n_row + row + 1)*64 + n_col_1 + s_col];
+                        b_tile_1[q+1] = Nds[(n_row + row)*64 + n_col_1 + s_col + 1];
 
                         b_tile_2[q] = Nds[(n_row + row)*64 + n_col_2 + s_col];
-                        b_tile_2[q+1] = Nds[(n_row + row + 1)*64 + n_col_2 + s_col];
+                        b_tile_2[q+1] = Nds[(n_row + row)*64 + n_col_2 + s_col + 1];
                     }
 
                     __syncwarp();
