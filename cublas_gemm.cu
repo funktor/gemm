@@ -726,11 +726,11 @@ void gemm_mma_sync_fp16_swizzled(
     for (int i = 0; i < 16; i++) {
         for (int j = 0; j < 16; j++) {
             for (int k1 = 0; k1 < k; k1 += 16) {
-                int a_row = (4 * blockIdx.y + i) * 16;
+                int a_row = (16 * blockIdx.y + i) * 16;
                 int a_col = k1;
 
                 int b_row = k1;
-                int b_col = (4 * blockIdx.x + j) * 16;
+                int b_col = (16 * blockIdx.x + j) * 16;
 
                 for (int j1 = idx; j1 < 16*16; j1 += blockDim.x * blockDim.y) {
                     int row = j1/16;
