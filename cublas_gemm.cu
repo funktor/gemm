@@ -769,20 +769,23 @@ void gemm_mma_sync_fp16_swizzled(
                     for (int q = 0; q < 8; q += 2) {
                         int row = (thread_id_in_warp >> 2) + 8 * ((q / 2) % 2);
                         int col = 2 * (thread_id_in_warp % 4) + (q % 2) + 8 * (q / 4);
-                        // int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
+                        int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                        a_tile[q] = Mds[(m_row + row)*64 + m_col + col];
-                        a_tile[q+1] = Mds[(m_row + row)*64 + m_col + col + 1];
+                        a_tile[q] = Mds[(m_row + row)*64 + m_col + s_col];
+                        a_tile[q+1] = Mds[(m_row + row)*64 + m_col + s_col + 1];
                     }
 
                     #pragma unroll
-                    for (int q = 0; q < 4; q++) {
+                    for (int q = 0; q < 4; q += 2) {
                         int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
                         int col = thread_id_in_warp >> 2;
-                        // int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
+                        int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                        b_tile_1[q] = Nds[(n_row + row)*64 + n_col_1 + col];
-                        b_tile_2[q] = Nds[(n_row + row)*64 + n_col_2 + col];
+                        b_tile_1[q] = Nds[(n_row + row)*64 + n_col_1 + s_col];
+                        b_tile_2[q] = Nds[(n_row + row)*64 + n_col_2 + s_col];
+
+                        b_tile_1[q+1] = Nds[(n_row + row + 1)*64 + n_col_1 + s_col];
+                        b_tile_2[q+1] = Nds[(n_row + row + 1)*64 + n_col_2 + s_col];
                     }
 
                     __syncwarp();
@@ -815,10 +818,8 @@ void gemm_mma_sync_fp16_swizzled(
                     for (int q = 0; q < 4; q++) {
                         int rw = (thread_id_in_warp >> 2) + 8 * (q / 2);
                         int cl = 2 * (thread_id_in_warp % 4) + (q % 2);
-                        int s_col = (cl/8)*8 + (2*((rw % 8)^((cl % 8)/2)) + ((cl % 8) % 2)) % 8;
-
-                        c[(a_row + m_row + rw) * n + (b_col + n_col_1 + s_col)] += regs_c_1[q];
-                        c[(a_row + m_row + rw) * n + (b_col + n_col_2 + s_col)] += regs_c_2[q];
+                        c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[q];
+                        c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
                     }
                 }
                 __syncthreads();
