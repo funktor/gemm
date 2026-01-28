@@ -757,13 +757,6 @@ void gemm_mma_sync_fp16_swizzled(
                 float regs_c_1[4] = {0.0f};
                 float regs_c_2[4] = {0.0f};
 
-                int m_row = warp_row_id * 16;
-                int m_col = k2;
-
-                int n_row = k2;
-                int n_col_1 = warp_col_id * 16;
-                int n_col_2 = n_col_1 + 8;
-
                 #pragma unroll
                 for (int q = 0; q < 8; q += 2) {
                     int row = (thread_id_in_warp >> 2) + 8 * ((q / 2) % 2);
