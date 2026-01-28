@@ -779,7 +779,7 @@ void gemm_mma_sync_fp16_swizzled(
                     for (int q = 0; q < 4; q += 2) {
                         int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
                         int col = thread_id_in_warp >> 2;
-                        int s_row = (row/8)*8 + (2*((col % 8)^((col % 8)/2)) + ((row % 8) % 2)) % 8;
+                        int s_row = (row/8)*8 + (2*((col % 8)^((row % 8)/2)) + ((row % 8) % 2)) % 8;
 
                         b_tile_1[q] = Nds[(n_row_1 + s_row)*64 + n_col + col];
                         b_tile_1[q+1] = Nds[(n_row_1 + s_row + 1)*64 + n_col + col];
