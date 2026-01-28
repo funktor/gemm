@@ -714,8 +714,8 @@ void gemm_mma_sync_fp16_swizzled(
     const int n, 
     const int k
 ) {
-    __shared__ alignas(16) half Mds[64*64];
-    __shared__ alignas(16) half Nds[64*64];
+    __shared__ alignas(16) half Mds[16*16];
+    __shared__ alignas(16) half Nds[16*16];
 
     int idx = threadIdx.y * blockDim.x + threadIdx.x;
 
@@ -723,105 +723,104 @@ void gemm_mma_sync_fp16_swizzled(
     int warp_col_id = (idx % blockDim.x)/32;
     int thread_id_in_warp = idx % 32;
 
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            for (int k1 = 0; k1 < k; k1 += 64) {
-                int a_row = (4 * blockIdx.y + i) * 64;
+    for (int i = 0; i < 16; i++) {
+        for (int j = 0; j < 16; j++) {
+            for (int k1 = 0; k1 < k; k1 += 16) {
+                int a_row = (4 * blockIdx.y + i) * 16;
                 int a_col = k1;
 
                 int b_row = k1;
-                int b_col = (4 * blockIdx.x + j) * 64;
+                int b_col = (4 * blockIdx.x + j) * 16;
 
-                for (int j1 = idx; j1 < 64*64; j1 += blockDim.x * blockDim.y) {
-                    int row = j1/64;
-                    int col = j1 % 64;
+                for (int j1 = idx; j1 < 16*16; j1 += blockDim.x * blockDim.y) {
+                    int row = j1/16;
+                    int col = j1 % 16;
                     int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                    Mds[row*64 + s_col] = a[(a_row + row) * k + (a_col + col)];
+                    Mds[row*16 + s_col] = a[(a_row + row) * k + (a_col + col)];
                 }
 
-                for (int j1 = idx; j1 < 64*64; j1 += blockDim.x * blockDim.y) {
-                    int row = j1/64;
-                    int col = j1 % 64;
+                for (int j1 = idx; j1 < 16*16; j1 += blockDim.x * blockDim.y) {
+                    int row = j1/16;
+                    int col = j1 % 16;
                     int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                    Nds[row*64 + s_col] = b[(b_row + row) * n + (b_col + col)];
+                    Nds[row*16 + s_col] = b[(b_row + row) * n + (b_col + col)];
                 }
 
                 __syncthreads();
 
-                for (int k2 = 0; k2 < 64; k2 += 16) {
-                    half a_tile[8] = {};
-                    half b_tile_1[4] = {};
-                    half b_tile_2[4] = {};
+                half a_tile[8] = {};
+                half b_tile_1[4] = {};
+                half b_tile_2[4] = {};
 
-                    float regs_c_1[4] = {0.0f};
-                    float regs_c_2[4] = {0.0f};
+                float regs_c_1[4] = {0.0f};
+                float regs_c_2[4] = {0.0f};
 
-                    int m_row = warp_row_id * 16;
-                    int m_col = k2;
+                int m_row = warp_row_id * 16;
+                int m_col = k2;
 
-                    int n_row = k2;
-                    int n_col_1 = warp_col_id * 16;
-                    int n_col_2 = n_col_1 + 8;
+                int n_row = k2;
+                int n_col_1 = warp_col_id * 16;
+                int n_col_2 = n_col_1 + 8;
 
-                    #pragma unroll
-                    for (int q = 0; q < 8; q += 2) {
-                        int row = (thread_id_in_warp >> 2) + 8 * ((q / 2) % 2);
-                        int col = 2 * (thread_id_in_warp % 4) + (q % 2) + 8 * (q / 4);
-                        int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
+                #pragma unroll
+                for (int q = 0; q < 8; q += 2) {
+                    int row = (thread_id_in_warp >> 2) + 8 * ((q / 2) % 2);
+                    int col = 2 * (thread_id_in_warp % 4) + (q % 2) + 8 * (q / 4);
+                    int s_col = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                        a_tile[q] = Mds[(m_row + row)*64 + m_col + s_col];
-                        a_tile[q+1] = Mds[(m_row + row)*64 + m_col + s_col + 1];
-                    }
+                    a_tile[q] = Mds[row*16 + s_col];
+                    a_tile[q+1] = Mds[row*16 + s_col + 1];
+                }
 
-                    #pragma unroll
-                    for (int q = 0; q < 4; q += 2) {
-                        int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
-                        int col = thread_id_in_warp >> 2;
-                        int s_col_1 = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
-                        int s_col_2 = (col/8)*8 + (2*(((row+1) % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
+                #pragma unroll
+                for (int q = 0; q < 4; q += 2) {
+                    int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
+                    int col = thread_id_in_warp >> 2;
 
-                        b_tile_1[q] = Nds[(n_row + row)*64 + n_col_1 + s_col_1];
-                        b_tile_2[q] = Nds[(n_row + row)*64 + n_col_2 + s_col_1];
+                    int s_col_1 = (col/8)*8 + (2*((row % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
+                    int s_col_2 = (col/8)*8 + (2*(((row+1) % 8)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                        b_tile_1[q+1] = Nds[(n_row + row + 1)*64 + n_col_1 + s_col_2];
-                        b_tile_2[q+1] = Nds[(n_row + row + 1)*64 + n_col_2 + s_col_2];
-                    }
+                    b_tile_1[q] = Nds[row*16 + s_col_1];
+                    b_tile_2[q] = Nds[row*16 + s_col_1 + 8];
 
-                    __syncwarp();
+                    b_tile_1[q+1] = Nds[(row + 1)*16 + s_col_2];
+                    b_tile_2[q+1] = Nds[(row + 1)*16 + s_col_2 + 8];
+                }
 
-                    const int *regs_a = (const int *)a_tile;
-                    const int *regs_b_1 = (const int *)b_tile_1;
-                    const int *regs_b_2 = (const int *)b_tile_2;
+                __syncwarp();
 
-                    asm volatile(
-                        "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
-                        "{%0, %1, %2, %3}, "
-                        "{%4, %5, %6, %7}, "
-                        "{%8, %9}, "
-                        "{%0, %1, %2, %3};\n"
-                        : "+f"(regs_c_1[0]), "+f"(regs_c_1[1]), "+f"(regs_c_1[2]),"+f"(regs_c_1[3])
-                        : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_1[0]), "r"(regs_b_1[1])
-                    );
+                const int *regs_a = (const int *)a_tile;
+                const int *regs_b_1 = (const int *)b_tile_1;
+                const int *regs_b_2 = (const int *)b_tile_2;
 
-                    asm volatile(
-                        "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
-                        "{%0, %1, %2, %3}, "
-                        "{%4, %5, %6, %7}, "
-                        "{%8, %9}, "
-                        "{%0, %1, %2, %3};\n"
-                        : "+f"(regs_c_2[0]), "+f"(regs_c_2[1]), "+f"(regs_c_2[2]),"+f"(regs_c_2[3])
-                        : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_2[0]), "r"(regs_b_2[1])
-                    );
+                asm volatile(
+                    "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+                    "{%0, %1, %2, %3}, "
+                    "{%4, %5, %6, %7}, "
+                    "{%8, %9}, "
+                    "{%0, %1, %2, %3};\n"
+                    : "+f"(regs_c_1[0]), "+f"(regs_c_1[1]), "+f"(regs_c_1[2]),"+f"(regs_c_1[3])
+                    : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_1[0]), "r"(regs_b_1[1])
+                );
 
-                    #pragma unroll
-                    for (int q = 0; q < 4; q++) {
-                        int rw = (thread_id_in_warp >> 2) + 8 * (q / 2);
-                        int cl = 2 * (thread_id_in_warp % 4) + (q % 2);
-                        c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[q];
-                        c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
-                    }
+                asm volatile(
+                    "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+                    "{%0, %1, %2, %3}, "
+                    "{%4, %5, %6, %7}, "
+                    "{%8, %9}, "
+                    "{%0, %1, %2, %3};\n"
+                    : "+f"(regs_c_2[0]), "+f"(regs_c_2[1]), "+f"(regs_c_2[2]),"+f"(regs_c_2[3])
+                    : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_2[0]), "r"(regs_b_2[1])
+                );
+
+                #pragma unroll
+                for (int q = 0; q < 4; q++) {
+                    int rw = (thread_id_in_warp >> 2) + 8 * (q / 2);
+                    int cl = 2 * (thread_id_in_warp % 4) + (q % 2);
+                    c[(a_row + rw) * n + (b_col + cl)] += regs_c_1[q];
+                    c[(a_row + rw) * n + (b_col + cl + 8)] += regs_c_2[q];
                 }
                 __syncthreads();
             }
@@ -1065,7 +1064,7 @@ int main(){
 
     for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_swz[i] = 0.0f;
 
-    dim3 bd8(128, 4, 1);
+    dim3 bd8(32, 1, 1);
     dim3 gd8((n+256-1)/256, (m+256-1)/256, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
