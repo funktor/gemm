@@ -530,7 +530,7 @@ void gemm_mma_sync_fp16(
 }
 
 __global__ 
-void gemm_mma_sync_fp16_vectorized(
+void gemm_mma_sync_fp16_2d_tiled(
     half *a, 
     half *b, 
     float *c, 
@@ -658,7 +658,7 @@ int get_swizzled_index(int row, int col, int k, int u, int v) {
 }
 
 __global__ 
-void gemm_mma_sync_fp16_swizzled(
+void gemm_mma_sync_fp16_2d_tiled_swizzled(
     half *a, 
     half *b, 
     float *c, 
@@ -703,76 +703,139 @@ void gemm_mma_sync_fp16_swizzled(
                 __syncthreads();
 
                 for (int k2 = 0; k2 < 32; k2 += 16) {
-                    // uint32_t regs_a[4];
+                    uint32_t regs_a[4];
 
-                    // uint32_t regs_b_1[2];
-                    // uint32_t regs_b_2[2];
+                    uint32_t regs_b_1[2];
+                    uint32_t regs_b_2[2];
 
-                    // int m_row = warp_row_id * 16;
-                    // int m_col = k2;
+                    int m_row = warp_row_id * 16;
+                    int m_col = k2;
 
-                    // int n_row = k2;
-                    // int n_col_1 = warp_col_id * 16;
-                    // int n_col_2 = n_col_1 + 8;
+                    int n_row = k2;
+                    int n_col_1 = warp_col_id * 16;
+                    int n_col_2 = n_col_1 + 8;
 
-                    // int x = (thread_id_in_warp/16) * 8 + m_col;
-                    // int y = n_col_1;
-                    // int z = n_col_2;
+                    int x = (thread_id_in_warp/16) * 8 + m_col;
+                    int y = n_col_1;
+                    int z = n_col_2;
 
-                    // x = get_swizzled_index(m_row + thread_id_in_warp % 16, x, 32, 2, 8);
-                    // y = get_swizzled_index(n_row + thread_id_in_warp % 16, y, 32, 2, 8);
-                    // z = get_swizzled_index(n_row + thread_id_in_warp % 16, z, 32, 2, 8);
+                    x = get_swizzled_index(m_row + thread_id_in_warp % 16, x, 32, 2, 8);
+                    y = get_swizzled_index(n_row + thread_id_in_warp % 16, y, 32, 2, 8);
+                    z = get_swizzled_index(n_row + thread_id_in_warp % 16, z, 32, 2, 8);
 
-                    // uint32_t addr_a   = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * 32 + x]);
-                    // uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 32 + y]);
-                    // uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 32 + z]);
+                    uint32_t addr_a   = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * 32 + x]);
+                    uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 32 + y]);
+                    uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 32 + z]);
 
-                    // asm volatile(
-                    //     "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
-                    //     "{%0, %1, %2, %3}, [%4];"
-                    //     : "=r"(regs_a[0]), "=r"(regs_a[1]), "=r"(regs_a[2]), "=r"(regs_a[3])
-                    //     : "r"(addr_a)
-                    // );
+                    asm volatile(
+                        "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
+                        "{%0, %1, %2, %3}, [%4];"
+                        : "=r"(regs_a[0]), "=r"(regs_a[1]), "=r"(regs_a[2]), "=r"(regs_a[3])
+                        : "r"(addr_a)
+                    );
 
-                    // asm volatile(
-                    //     "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
-                    //     "{%0, %1}, [%2];"
-                    //     : "=r"(regs_b_1[0]), "=r"(regs_b_1[1])
-                    //     : "r"(addr_b_1)
-                    // );
+                    asm volatile(
+                        "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
+                        "{%0, %1}, [%2];"
+                        : "=r"(regs_b_1[0]), "=r"(regs_b_1[1])
+                        : "r"(addr_b_1)
+                    );
 
-                    // asm volatile(
-                    //     "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
-                    //     "{%0, %1}, [%2];"
-                    //     : "=r"(regs_b_2[0]), "=r"(regs_b_2[1])
-                    //     : "r"(addr_b_2)
-                    // );
+                    asm volatile(
+                        "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
+                        "{%0, %1}, [%2];"
+                        : "=r"(regs_b_2[0]), "=r"(regs_b_2[1])
+                        : "r"(addr_b_2)
+                    );
 
-                    // asm volatile(
-                    //     "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
-                    //     "{%0, %1, %2, %3}, "
-                    //     "{%4, %5, %6, %7}, "
-                    //     "{%8, %9}, "
-                    //     "{%0, %1, %2, %3};\n"
-                    //     : "+f"(regs_c_1[0]), "+f"(regs_c_1[1]), "+f"(regs_c_1[2]),"+f"(regs_c_1[3])
-                    //     : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_1[0]), "r"(regs_b_1[1])
-                    // );
+                    asm volatile(
+                        "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+                        "{%0, %1, %2, %3}, "
+                        "{%4, %5, %6, %7}, "
+                        "{%8, %9}, "
+                        "{%0, %1, %2, %3};\n"
+                        : "+f"(regs_c_1[0]), "+f"(regs_c_1[1]), "+f"(regs_c_1[2]),"+f"(regs_c_1[3])
+                        : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_1[0]), "r"(regs_b_1[1])
+                    );
 
-                    // asm volatile(
-                    //     "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
-                    //     "{%0, %1, %2, %3}, "
-                    //     "{%4, %5, %6, %7}, "
-                    //     "{%8, %9}, "
-                    //     "{%0, %1, %2, %3};\n"
-                    //     : "+f"(regs_c_2[0]), "+f"(regs_c_2[1]), "+f"(regs_c_2[2]),"+f"(regs_c_2[3])
-                    //     : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_2[0]), "r"(regs_b_2[1])
-                    // );
+                    asm volatile(
+                        "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+                        "{%0, %1, %2, %3}, "
+                        "{%4, %5, %6, %7}, "
+                        "{%8, %9}, "
+                        "{%0, %1, %2, %3};\n"
+                        : "+f"(regs_c_2[0]), "+f"(regs_c_2[1]), "+f"(regs_c_2[2]),"+f"(regs_c_2[3])
+                        : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_2[0]), "r"(regs_b_2[1])
+                    );
+                }
+                __syncthreads();
+            }
+
+            int a_row = (8 * blockIdx.y + i) * 32;
+            int b_col = (8 * blockIdx.x + j) * 32;
+
+            int m_row   = warp_row_id * 16;
+            int n_col_1 = warp_col_id * 16;
+            int n_col_2 = n_col_1 + 8;
+
+            #pragma unroll
+            for (int q = 0; q < 4; q++) {
+                int rw = (thread_id_in_warp >> 2) + 8 * (q / 2);
+                int cl = 2 * (thread_id_in_warp % 4) + (q % 2);
+                c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[q];
+                c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
+            }
+        }
+    }
+}
 
 
+__global__ 
+void gemm_mma_sync_fp16_2d_tiled_swizzled_explicit(
+    half *a, 
+    half *b, 
+    float *c, 
+    const float alpha, 
+    const float beta, 
+    const int m, 
+    const int n, 
+    const int k
+) {
+    __shared__ alignas(16) half Mds[32*32];
+    __shared__ alignas(16) half Nds[32*32];
 
+    int idx = threadIdx.y * blockDim.x + threadIdx.x;
 
+    int warp_row_id = idx/blockDim.x;
+    int warp_col_id = (idx % blockDim.x)/32;
+    int thread_id_in_warp = idx % 32;
 
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
 
+            float regs_c_1[4] = {0.0f};
+            float regs_c_2[4] = {0.0f};
+
+            for (int k1 = 0; k1 < k; k1 += 32) {
+                int a_row = (8 * blockIdx.y + i) * 32;
+                int a_col = k1;
+
+                int b_row = k1;
+                int b_col = (8 * blockIdx.x + j) * 32;
+
+                #pragma unroll
+                for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
+                    int row = j1/32;
+                    int col = j1 % 32;
+                    int s_col = get_swizzled_index(row, col, 8, 2, 2);
+
+                    Mds[row*32 + s_col] = a[(a_row + row) * k + (a_col + col)];
+                    Nds[row*32 + s_col] = b[(b_row + row) * n + (b_col + col)];
+                }
+
+                __syncthreads();
+
+                for (int k2 = 0; k2 < 32; k2 += 16) {
                     half a_tile[8] = {};
                     half b_tile_1[4] = {};
                     half b_tile_2[4] = {};
@@ -788,7 +851,7 @@ void gemm_mma_sync_fp16_swizzled(
                     for (int q = 0; q < 8; q += 2) {
                         int row = (thread_id_in_warp >> 2) + 8 * ((q / 2) % 2);
                         int col = 2 * (thread_id_in_warp % 4) + (q % 2) + 8 * (q / 4);
-                        int s_col = get_swizzled_index(row, col, 32, 2, 8);
+                        int s_col = get_swizzled_index(row, col, 8, 2, 2);
 
                         a_tile[q]   = Mds[(m_row + row)*32 + m_col + s_col];
                         a_tile[q+1] = Mds[(m_row + row)*32 + m_col + s_col + 1];
@@ -798,8 +861,9 @@ void gemm_mma_sync_fp16_swizzled(
                     for (int q = 0; q < 4; q += 2) {
                         int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
                         int col = thread_id_in_warp >> 2;
-                        int s_col_1 = get_swizzled_index(row, col, 32, 2, 8);
-                        int s_col_2 = get_swizzled_index(row+1, col, 32, 2, 8);
+
+                        int s_col_1 = get_swizzled_index(row + 0, col, 8, 2, 2);
+                        int s_col_2 = get_swizzled_index(row + 1, col, 8, 2, 2);
 
                         b_tile_1[q]   = Nds[(n_row + row)*32 + n_col_1 + s_col_1];
                         b_tile_2[q]   = Nds[(n_row + row)*32 + n_col_2 + s_col_1];
@@ -1075,43 +1139,63 @@ int main(){
 
 
 
-    float *c_gpu_mma_sync_fp16_vec;
-    cudaErrCheck(cudaMallocManaged(&c_gpu_mma_sync_fp16_vec, m * n * sizeof(float)));
+    float *c_gpu_mma_sync_fp16_2d_tiled;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_mma_sync_fp16_2d_tiled, m * n * sizeof(float)));
 
-    for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_vec[i] = 0.0f;
+    for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_2d_tiled[i] = 0.0f;
 
     dim3 bd7(64, 2, 1);
     dim3 gd7((n+256-1)/256, (m+256-1)/256, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_mma_sync_fp16_vectorized<<<gd7, bd7>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16_vec, 1.0, 0.0, m, n, k);
+    gemm_mma_sync_fp16_2d_tiled<<<gd7, bd7>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16_2d_tiled, 1.0, 0.0, m, n, k);
     cudaDeviceSynchronize();
     cudaErrCheck(cudaEventRecord(stopcublas));
     cudaErrCheck(cudaEventSynchronize(stopcublas));
     cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    std::cout << "GPU MMA SYNC FP16 VEC GEMM Duration = " << cublasTime << " ms" << std::endl;
-    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_mma_sync_fp16_vec, m*n) << std::endl;
-    cudaErrCheck(cudaFree(c_gpu_mma_sync_fp16_vec));
+    std::cout << "GPU MMA SYNC FP16 2D TILED GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_mma_sync_fp16_2d_tiled, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_mma_sync_fp16_2d_tiled));
 
 
 
-    float *c_gpu_mma_sync_fp16_swz;
-    cudaErrCheck(cudaMallocManaged(&c_gpu_mma_sync_fp16_swz, m * n * sizeof(float)));
+    float *c_gpu_mma_sync_fp16_2d_tiled_swz;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_mma_sync_fp16_2d_tiled_swz, m * n * sizeof(float)));
 
-    for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_swz[i] = 0.0f;
+    for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_2d_tiled_swz[i] = 0.0f;
 
     dim3 bd8(64, 2, 1);
     dim3 gd8((n+256-1)/256, (m+256-1)/256, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_mma_sync_fp16_swizzled<<<gd8, bd8>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16_swz, 1.0, 0.0, m, n, k);
+    gemm_mma_sync_fp16_2d_tiled_swizzled<<<gd8, bd8>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16_2d_tiled_swz, 1.0, 0.0, m, n, k);
     cudaDeviceSynchronize();
     cudaErrCheck(cudaEventRecord(stopcublas));
     cudaErrCheck(cudaEventSynchronize(stopcublas));
     cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    std::cout << "GPU MMA SYNC FP16 SWIZZLED GEMM Duration = " << cublasTime << " ms" << std::endl;
-    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_mma_sync_fp16_swz, m*n) << std::endl;
-    cudaErrCheck(cudaFree(c_gpu_mma_sync_fp16_swz));
+    std::cout << "GPU MMA SYNC FP16 2D TILED SWIZZLED GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_mma_sync_fp16_2d_tiled_swz, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_mma_sync_fp16_2d_tiled_swz));
+
+
+
+    float *c_gpu_mma_sync_fp16_2d_tiled_swz_exp;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_mma_sync_fp16_2d_tiled_swz_exp, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_2d_tiled_swz_exp[i] = 0.0f;
+
+    dim3 bd9(64, 2, 1);
+    dim3 gd9((n+256-1)/256, (m+256-1)/256, 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_mma_sync_fp16_2d_tiled_swizzled_explicit<<<gd9, bd9>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16_2d_tiled_swz_exp, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU MMA SYNC FP16 2D TILED SWIZZLED EXPLICIT GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_mma_sync_fp16_2d_tiled_swz_exp, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_mma_sync_fp16_2d_tiled_swz_exp));
 
 
 
