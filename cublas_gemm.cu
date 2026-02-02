@@ -558,17 +558,12 @@ void gemm_mma_sync_fp16_vectorized(
                 int b_row = k1;
                 int b_col = (8 * blockIdx.x + j) * 32;
 
+                #pragma unroll
                 for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
                     int row = j1/32;
                     int col = j1 % 32;
 
                     Mds[row*32 + col] = a[(a_row + row) * k + (a_col + col)];
-                }
-
-                for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
-                    int row = j1/32;
-                    int col = j1 % 32;
-
                     Nds[row*32 + col] = b[(b_row + row) * n + (b_col + col)];
                 }
 
@@ -634,16 +629,23 @@ void gemm_mma_sync_fp16_vectorized(
                         : "+f"(regs_c_2[0]), "+f"(regs_c_2[1]), "+f"(regs_c_2[2]),"+f"(regs_c_2[3])
                         : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_2[0]), "r"(regs_b_2[1])
                     );
-
-                    #pragma unroll
-                    for (int q = 0; q < 4; q++) {
-                        int rw = (thread_id_in_warp >> 2) + 8 * (q / 2);
-                        int cl = 2 * (thread_id_in_warp % 4) + (q % 2);
-                        c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[q];
-                        c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
-                    }
                 }
                 __syncthreads();
+            }
+
+            int a_row = (8 * blockIdx.y + i) * 32;
+            int b_col = (8 * blockIdx.x + j) * 32;
+
+            int m_row   = warp_row_id * 16;
+            int n_col_1 = warp_col_id * 16;
+            int n_col_2 = n_col_1 + 8;
+
+            #pragma unroll
+            for (int q = 0; q < 4; q++) {
+                int rw = (thread_id_in_warp >> 2) + 8 * (q / 2);
+                int cl = 2 * (thread_id_in_warp % 4) + (q % 2);
+                c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[q];
+                c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
             }
         }
     }
@@ -682,19 +684,13 @@ void gemm_mma_sync_fp16_swizzled(
                 int b_row = k1;
                 int b_col = (8 * blockIdx.x + j) * 32;
 
+                #pragma unroll
                 for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
                     int row = j1/32;
                     int col = j1 % 32;
                     int s_col = (col/8)*8 + (2*(((row % 8)/2)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
                     Mds[row*32 + s_col] = a[(a_row + row) * k + (a_col + col)];
-                }
-
-                for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
-                    int row = j1/32;
-                    int col = j1 % 32;
-                    int s_col = (col/8)*8 + (2*(((row % 8)/2)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
-
                     Nds[row*32 + s_col] = b[(b_row + row) * n + (b_col + col)];
                 }
 
