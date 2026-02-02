@@ -694,7 +694,7 @@ void gemm_mma_sync_fp16_swizzled(
                 for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
                     int row = j1/32;
                     int col = j1 % 32;
-                    int s_col = get_swizzled_index(row, col 8, 2);
+                    int s_col = get_swizzled_index(row, col, 8, 2);
 
                     Mds[row*32 + s_col] = a[(a_row + row) * k + (a_col + col)];
                     Nds[row*32 + s_col] = b[(b_row + row) * n + (b_col + col)];
@@ -728,8 +728,8 @@ void gemm_mma_sync_fp16_swizzled(
                     for (int q = 0; q < 4; q += 2) {
                         int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
                         int col = thread_id_in_warp >> 2;
-                        int s_col_1 = get_swizzled_index(row, col 8, 2);
-                        int s_col_2 = get_swizzled_index(row+1, col 8, 2);
+                        int s_col_1 = get_swizzled_index(row, col, 8, 2);
+                        int s_col_2 = get_swizzled_index(row+1, col, 8, 2);
 
                         b_tile_1[q]   = Nds[(n_row + row)*32 + n_col_1 + s_col_1];
                         b_tile_2[q]   = Nds[(n_row + row)*32 + n_col_2 + s_col_1];
