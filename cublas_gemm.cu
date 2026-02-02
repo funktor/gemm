@@ -769,7 +769,7 @@ void gemm_mma_sync_fp16_swizzled(
                         int col = 2 * (thread_id_in_warp % 4) + (q % 2) + 8 * (q / 4);
                         int s_col = (col/8)*8 + (2*(((row % 8))^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                        a_tile[q] = Mds[(m_row + row)*64 + m_col + s_col];
+                        a_tile[q]   = Mds[(m_row + row)*64 + m_col + s_col];
                         a_tile[q+1] = Mds[(m_row + row)*64 + m_col + s_col + 1];
                     }
 
@@ -777,10 +777,11 @@ void gemm_mma_sync_fp16_swizzled(
                     for (int q = 0; q < 4; q += 2) {
                         int row = (thread_id_in_warp % 4) * 2 + (q % 2) + 8 * (q / 2);
                         int col = thread_id_in_warp >> 2;
-                        int s_col = (col/8)*8 + (2*(((row % 8))^((col % 8)/2)) + ((col % 8) % 2)) % 8;
+                        int s_col_1 = (col/8)*8 + (2*(((row % 8))^((col % 8)/2)) + ((col % 8) % 2)) % 8;
+                        int s_col_2 = (col/8)*8 + (2*((((row+1) % 8))^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                        b_tile[q]   = Nds[(n_row + row)*64 + n_col + s_col];
-                        b_tile[q+1] = Nds[(n_row + row + 1)*64 + n_col + s_col];
+                        b_tile[q]   = Nds[(n_row + row + 0)*64 + n_col + s_col_1];
+                        b_tile[q+1] = Nds[(n_row + row + 1)*64 + n_col + s_col_2];
                     }
 
                     __syncwarp();
