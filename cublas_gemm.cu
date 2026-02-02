@@ -709,24 +709,15 @@ void gemm_mma_sync_fp16_swizzled(
                     uint32_t regs_b_2[2];
 
                     int m_row = warp_row_id * 16;
-                    int m_col = k2;
+                    int m_col = get_swizzled_index(m_row + thread_id_in_warp % 16, (thread_id_in_warp/16) * 8 + k2, 32, 2, 8);;
 
                     int n_row = k2;
-                    int n_col_1 = warp_col_id * 16;
+                    int n_col_1 = get_swizzled_index(n_row + thread_id_in_warp % 16, warp_col_id * 16, 32, 2, 8);
                     int n_col_2 = n_col_1 + 8;
 
-                    int x = (thread_id_in_warp/16) * 8 + m_col;
-                    int y = n_col_1;
-                    int z = n_col_2;
-
-                    x = get_swizzled_index(m_row + thread_id_in_warp % 16, x, 32, 2, 8);
-                    y = get_swizzled_index(n_row + thread_id_in_warp % 16, y, 32, 2, 8);
-                    z = get_swizzled_index(n_row + thread_id_in_warp % 16, z, 32, 2, 8);
-
-
-                    uint32_t addr_a   = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * 32 + x]);
-                    uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 32 + y]);
-                    uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 32 + z]);
+                    uint32_t addr_a   = __cvta_generic_to_shared(&Mds[(m_row + thread_id_in_warp % 16) * 32 + m_col]);
+                    uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 32 + n_col_1]);
+                    uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[(n_row + thread_id_in_warp % 16) * 32 + n_col_2]);
 
                     asm volatile(
                         "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
