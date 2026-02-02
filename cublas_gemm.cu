@@ -367,20 +367,20 @@ void gemm_wmma_shmm(
 
     wmma::fill_fragment(acc_frag, 0.0f);
 
+    int idx = threadIdx.y * blockDim.x + threadIdx.x;
+
     for (int i = 0; i < k; i += TILE_WIDTH_WMMA) {
         int a_block_row = blockIdx.y * TILE_WIDTH_WMMA;
         int a_block_col = i;
-        int a_idx = threadIdx.y * blockDim.x + threadIdx.x;
 
-        for (int j = a_idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
+        for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
             Mds[j] = a[(a_block_row + j/TILE_WIDTH_WMMA) * k + a_block_col + (j % TILE_WIDTH_WMMA)];
         }
 
         int b_block_row = i;
         int b_block_col = blockIdx.x * TILE_WIDTH_WMMA;
-        int b_idx = threadIdx.y * blockDim.x + threadIdx.x;
 
-        for (int j = b_idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
+        for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
             Nds[j] = b[(b_block_row + j/TILE_WIDTH_WMMA) * n + b_block_col + (j % TILE_WIDTH_WMMA)];
         }
 
@@ -671,6 +671,10 @@ void gemm_mma_sync_fp16_swizzled(
 
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
+
+            float regs_c_1[4] = {0.0f};
+            float regs_c_2[4] = {0.0f};
+
             for (int k1 = 0; k1 < k; k1 += 32) {
                 int a_row = (8 * blockIdx.y + i) * 32;
                 int a_col = k1;
@@ -700,9 +704,6 @@ void gemm_mma_sync_fp16_swizzled(
                     half a_tile[8] = {};
                     half b_tile_1[4] = {};
                     half b_tile_2[4] = {};
-
-                    float regs_c_1[4] = {0.0f};
-                    float regs_c_2[4] = {0.0f};
 
                     int m_row = warp_row_id * 16;
                     int m_col = k2;
@@ -760,16 +761,23 @@ void gemm_mma_sync_fp16_swizzled(
                         : "+f"(regs_c_2[0]), "+f"(regs_c_2[1]), "+f"(regs_c_2[2]),"+f"(regs_c_2[3])
                         : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_2[0]), "r"(regs_b_2[1])
                     );
-
-                    #pragma unroll
-                    for (int q = 0; q < 4; q++) {
-                        int rw = (thread_id_in_warp >> 2) + 8 * (q / 2);
-                        int cl = 2 * (thread_id_in_warp % 4) + (q % 2);
-                        c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[q];
-                        c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
-                    }
                 }
                 __syncthreads();
+            }
+
+            int a_row = (8 * blockIdx.y + i) * 32;
+            int b_col = (8 * blockIdx.x + j) * 32;
+
+            int m_row   = warp_row_id * 16;
+            int n_col_1 = warp_col_id * 16;
+            int n_col_2 = n_col_1 + 8;
+
+            #pragma unroll
+            for (int q = 0; q < 4; q++) {
+                int rw = (thread_id_in_warp >> 2) + 8 * (q / 2);
+                int cl = 2 * (thread_id_in_warp % 4) + (q % 2);
+                c[(a_row + m_row + rw) * n + (b_col + n_col_1 + cl)] += regs_c_1[q];
+                c[(a_row + m_row + rw) * n + (b_col + n_col_2 + cl)] += regs_c_2[q];
             }
         }
     }
@@ -808,9 +816,9 @@ void convertFp32ToFp16 (half *out, const float *in, const long n) {
 }
 
 int main(){
-    int m = 2048;
-    int n = 2048;
-    int k = 256;
+    int m = 4096;
+    int n = 4096;
+    int k = 128;
 
     float *a_fp32;
     float *b_fp32;
