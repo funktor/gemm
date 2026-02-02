@@ -551,6 +551,10 @@ void gemm_mma_sync_fp16_vectorized(
 
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
+            
+            float regs_c_1[4] = {0.0f};
+            float regs_c_2[4] = {0.0f};
+
             for (int k1 = 0; k1 < k; k1 += 32) {
                 int a_row = (8 * blockIdx.y + i) * 32;
                 int a_col = k1;
@@ -574,9 +578,6 @@ void gemm_mma_sync_fp16_vectorized(
 
                     uint32_t regs_b_1[2];
                     uint32_t regs_b_2[2];
-
-                    float regs_c_1[4] = {0.0f};
-                    float regs_c_2[4] = {0.0f};
 
                     int m_row = warp_row_id * 16;
                     int m_col = k2;
