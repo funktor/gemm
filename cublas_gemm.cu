@@ -717,7 +717,7 @@ void gemm_mma_sync_fp16_swizzled(
                         int col = 2 * (thread_id_in_warp % 4) + (q % 2) + 8 * (q / 4);
                         int s_col = (col/8)*8 + (2*(((row % 8)/2)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                        a_tile[q] = Mds[(m_row + row)*32 + m_col + s_col];
+                        a_tile[q]   = Mds[(m_row + row)*32 + m_col + s_col];
                         a_tile[q+1] = Mds[(m_row + row)*32 + m_col + s_col + 1];
                     }
 
@@ -728,8 +728,8 @@ void gemm_mma_sync_fp16_swizzled(
                         int s_col_1 = (col/8)*8 + (2*(((row % 8)/2)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
                         int s_col_2 = (col/8)*8 + (2*((((row+1) % 8)/2)^((col % 8)/2)) + ((col % 8) % 2)) % 8;
 
-                        b_tile_1[q] = Nds[(n_row + row)*32 + n_col_1 + s_col_1];
-                        b_tile_2[q] = Nds[(n_row + row)*32 + n_col_2 + s_col_1];
+                        b_tile_1[q]   = Nds[(n_row + row)*32 + n_col_1 + s_col_1];
+                        b_tile_2[q]   = Nds[(n_row + row)*32 + n_col_2 + s_col_1];
 
                         b_tile_1[q+1] = Nds[(n_row + row + 1)*32 + n_col_1 + s_col_2];
                         b_tile_2[q+1] = Nds[(n_row + row + 1)*32 + n_col_2 + s_col_2];
@@ -808,9 +808,9 @@ void convertFp32ToFp16 (half *out, const float *in, const long n) {
 }
 
 int main(){
-    int m = 4096;
-    int n = 4096;
-    int k = 256;
+    int m = 2048;
+    int n = 2048;
+    int k = 2048;
 
     float *a_fp32;
     float *b_fp32;
