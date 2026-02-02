@@ -853,166 +853,165 @@ int main(){
 
 
 
-    // float *c_gpu_fp32_ccores;
-    // cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_ccores, m * n * sizeof(float)));
+    float *c_gpu_fp32_ccores;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_ccores, m * n * sizeof(float)));
 
-    // for (auto i = 0; i < m*n; i++) c_gpu_fp32_ccores[i] = 0.0f;
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_ccores[i] = 0.0f;
 
-    // dim3 bd(32, 32, 1);
-    // dim3 gd((n+31)/32, (m+31)/32, 1);
+    dim3 bd(32, 32, 1);
+    dim3 gd((n+31)/32, (m+31)/32, 1);
 
-    // cudaErrCheck(cudaEventRecord(startcublas));
-    // gemm_fp32_cuda<<<gd, bd>>>(a_fp32, b_fp32, c_gpu_fp32_ccores, 1.0, 0.0, m, n, k);
-    // cudaDeviceSynchronize();
-    // cudaErrCheck(cudaEventRecord(stopcublas));
-    // cudaErrCheck(cudaEventSynchronize(stopcublas));
-    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    // std::cout << "GPU CUDA FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_ccores, m*n) << std::endl;
-
-
-
-    // float *c_gpu_fp32_tiled;
-    // cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled, m * n * sizeof(float)));
-
-    // for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled[i] = 0.0f;
-
-    // dim3 bd1(32, 32, 1);
-    // dim3 gd1((n+32*COARSE_FACTOR-1)/(32*COARSE_FACTOR), (m+31)/32, 1);
-
-    // cudaErrCheck(cudaEventRecord(startcublas));
-    // gemm_fp32_cuda_tiled<<<gd1, bd1>>>(a_fp32, b_fp32, c_gpu_fp32_tiled, 1.0, 0.0, m, n, k);
-    // cudaDeviceSynchronize();
-    // cudaErrCheck(cudaEventRecord(stopcublas));
-    // cudaErrCheck(cudaEventSynchronize(stopcublas));
-    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    // std::cout << "GPU CUDA TILED FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled, m*n) << std::endl;
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_fp32_cuda<<<gd, bd>>>(a_fp32, b_fp32, c_gpu_fp32_ccores, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU CUDA FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_ccores, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_fp32_ccores));
 
 
 
-    // float *c_gpu_fp32_tiled_2d;
-    // cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled_2d, m * n * sizeof(float)));
+    float *c_gpu_fp32_tiled;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled, m * n * sizeof(float)));
 
-    // for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d[i] = 0.0f;
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled[i] = 0.0f;
 
-    // dim3 bd2(32, 32, 1);
-    // dim3 gd2((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
+    dim3 bd1(32, 32, 1);
+    dim3 gd1((n+32*COARSE_FACTOR-1)/(32*COARSE_FACTOR), (m+31)/32, 1);
 
-    // cudaErrCheck(cudaEventRecord(startcublas));
-    // gemm_fp32_cuda_tiled_2D<<<gd2, bd2>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d, 1.0, 0.0, m, n, k);
-    // cudaDeviceSynchronize();
-    // cudaErrCheck(cudaEventRecord(stopcublas));
-    // cudaErrCheck(cudaEventSynchronize(stopcublas));
-    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    // std::cout << "GPU CUDA TILED 2D FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d, m*n) << std::endl;
-
-
-
-
-    // float *c_gpu_fp32_tiled_2d_vec;
-    // cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled_2d_vec, m * n * sizeof(float)));
-
-    // for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_vec[i] = 0.0f;
-
-    // dim3 bd3(8, 32, 1);
-    // dim3 gd3((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
-
-    // cudaErrCheck(cudaEventRecord(startcublas));
-    // gemm_fp32_cuda_tiled_2D_vectorize<<<gd3, bd3>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d_vec, 1.0, 0.0, m, n, k);
-    // cudaDeviceSynchronize();
-    // cudaErrCheck(cudaEventRecord(stopcublas));
-    // cudaErrCheck(cudaEventSynchronize(stopcublas));
-    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    // std::cout << "GPU CUDA TILED 2D VEC FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d_vec, m*n) << std::endl;
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_fp32_cuda_tiled<<<gd1, bd1>>>(a_fp32, b_fp32, c_gpu_fp32_tiled, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU CUDA TILED FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_fp32_tiled));
 
 
 
-    // half *a_fp16;
-    // half *b_fp16;
-    // float *c_gpu_fp32_wmma;
+    float *c_gpu_fp32_tiled_2d;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled_2d, m * n * sizeof(float)));
 
-    // cudaErrCheck(cudaMallocManaged(&a_fp16, m * k * sizeof(half)));
-    // cudaErrCheck(cudaMallocManaged(&b_fp16, k * n * sizeof(half)));
-    // cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_wmma, m * n * sizeof(float)));
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d[i] = 0.0f;
 
-    // for (auto i = 0; i < m*n; i++) c_gpu_fp32_wmma[i] = 0.0f;
+    dim3 bd2(32, 32, 1);
+    dim3 gd2((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
 
-    // convertFp32ToFp16 <<< (m * k + 255) / 256, 256 >>> (a_fp16, a_fp32, m * k);
-    // convertFp32ToFp16 <<< (k * n + 255) / 256, 256 >>> (b_fp16, b_fp32, k * n);
-    // cudaDeviceSynchronize();
-
-    // dim3 bd4(128, 4, 1);
-    // dim3 gd4((n+WMMA_N*128/32-1)/(WMMA_N*128/32), (m+WMMA_M*4-1)/(WMMA_M*4), 1);
-
-    // cudaErrCheck(cudaEventRecord(startcublas));
-    // gemm_wmma<<<gd4, bd4>>>(a_fp16, b_fp16, c_gpu_fp32_wmma, 1.0, 0.0, m, n, k);
-    // cudaDeviceSynchronize();
-    // cudaErrCheck(cudaEventRecord(stopcublas));
-    // cudaErrCheck(cudaEventSynchronize(stopcublas));
-    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    // std::cout << "GPU WMMA FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_wmma, m*n) << std::endl;
-
-
-
-    // float *c_gpu_fp32_wmma_shmm;
-    // cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_wmma_shmm, m * n * sizeof(float)));
-
-    // for (auto i = 0; i < m*n; i++) c_gpu_fp32_wmma_shmm[i] = 0.0f;
-
-    // dim3 bd5(128, 4, 1);
-    // dim3 gd5((n+WMMA_N*128/32-1)/(WMMA_N*128/32), (m+WMMA_M*4-1)/(WMMA_M*4), 1);
-
-    // cudaErrCheck(cudaEventRecord(startcublas));
-    // gemm_wmma_shmm<<<gd5, bd5>>>(a_fp16, b_fp16, c_gpu_fp32_wmma_shmm, 1.0, 0.0, m, n, k);
-    // cudaDeviceSynchronize();
-    // cudaErrCheck(cudaEventRecord(stopcublas));
-    // cudaErrCheck(cudaEventSynchronize(stopcublas));
-    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    // std::cout << "GPU WMMA SHMM FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_wmma_shmm, m*n) << std::endl;
-
-
-
-    // float *c_gpu_mma_sync_fp16;
-    // cudaErrCheck(cudaMallocManaged(&c_gpu_mma_sync_fp16, m * n * sizeof(float)));
-
-    // for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16[i] = 0.0f;
-
-    // dim3 bd6(128, 4, 1);
-    // dim3 gd6((n+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, (m+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, 1);
-
-    // cudaErrCheck(cudaEventRecord(startcublas));
-    // gemm_mma_sync_fp16<<<gd6, bd6>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16, 1.0, 0.0, m, n, k);
-    // cudaDeviceSynchronize();
-    // cudaErrCheck(cudaEventRecord(stopcublas));
-    // cudaErrCheck(cudaEventSynchronize(stopcublas));
-    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    // std::cout << "GPU MMA SYNC FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_mma_sync_fp16, m*n) << std::endl;
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_fp32_cuda_tiled_2D<<<gd2, bd2>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU CUDA TILED 2D FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_fp32_tiled_2d));
 
 
 
 
-    // float *c_gpu_mma_sync_fp16_vec;
-    // cudaErrCheck(cudaMallocManaged(&c_gpu_mma_sync_fp16_vec, m * n * sizeof(float)));
+    float *c_gpu_fp32_tiled_2d_vec;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled_2d_vec, m * n * sizeof(float)));
 
-    // for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_vec[i] = 0.0f;
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_vec[i] = 0.0f;
 
-    // dim3 bd7(64, 2, 1);
-    // dim3 gd7((n+256-1)/256, (m+256-1)/256, 1);
+    dim3 bd3(8, 32, 1);
+    dim3 gd3((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
 
-    // cudaErrCheck(cudaEventRecord(startcublas));
-    // gemm_mma_sync_fp16_vectorized<<<gd7, bd7>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16_vec, 1.0, 0.0, m, n, k);
-    // cudaDeviceSynchronize();
-    // cudaErrCheck(cudaEventRecord(stopcublas));
-    // cudaErrCheck(cudaEventSynchronize(stopcublas));
-    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    // std::cout << "GPU MMA SYNC FP16 VEC GEMM Duration = " << cublasTime << " ms" << std::endl;
-    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_mma_sync_fp16_vec, m*n) << std::endl;
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_fp32_cuda_tiled_2D_vectorize<<<gd3, bd3>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d_vec, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU CUDA TILED 2D VEC FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d_vec, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_fp32_tiled_2d_vec));
+
+
+
+    float *c_gpu_fp32_wmma;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_wmma, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_wmma[i] = 0.0f;
+
+    dim3 bd4(128, 4, 1);
+    dim3 gd4((n+WMMA_N*128/32-1)/(WMMA_N*128/32), (m+WMMA_M*4-1)/(WMMA_M*4), 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_wmma<<<gd4, bd4>>>(a_fp16, b_fp16, c_gpu_fp32_wmma, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU WMMA FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_wmma, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_fp32_wmma));
+
+
+
+    float *c_gpu_fp32_wmma_shmm;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_wmma_shmm, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_wmma_shmm[i] = 0.0f;
+
+    dim3 bd5(128, 4, 1);
+    dim3 gd5((n+WMMA_N*128/32-1)/(WMMA_N*128/32), (m+WMMA_M*4-1)/(WMMA_M*4), 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_wmma_shmm<<<gd5, bd5>>>(a_fp16, b_fp16, c_gpu_fp32_wmma_shmm, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU WMMA SHMM FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_wmma_shmm, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_fp32_wmma_shmm));
+
+
+
+    float *c_gpu_mma_sync_fp16;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_mma_sync_fp16, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16[i] = 0.0f;
+
+    dim3 bd6(128, 4, 1);
+    dim3 gd6((n+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, (m+TILE_WIDTH_WMMA-1)/TILE_WIDTH_WMMA, 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_mma_sync_fp16<<<gd6, bd6>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU MMA SYNC FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_mma_sync_fp16, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_mma_sync_fp16));
+
+
+
+
+    float *c_gpu_mma_sync_fp16_vec;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_mma_sync_fp16_vec, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_vec[i] = 0.0f;
+
+    dim3 bd7(64, 2, 1);
+    dim3 gd7((n+256-1)/256, (m+256-1)/256, 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_mma_sync_fp16_vectorized<<<gd7, bd7>>>(a_fp16, b_fp16, c_gpu_mma_sync_fp16_vec, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU MMA SYNC FP16 VEC GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_mma_sync_fp16_vec, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_mma_sync_fp16_vec));
 
 
 
@@ -1036,34 +1035,37 @@ int main(){
 
 
 
+    float *c_gpu_fp32;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32, m * n * sizeof(float)));
 
-    // float *c_gpu_fp32;
-    // cudaErrCheck(cudaMallocManaged(&c_gpu_fp32, m * n * sizeof(float)));
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32[i] = 0.0f;
 
-    // for (auto i = 0; i < m*n; i++) c_gpu_fp32[i] = 0.0f;
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_fp32_cublas(a_fp32, b_fp32, c_gpu_fp32, 1.0, 0.0, m, n, k);
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU CUBLAS FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_fp32));
 
-    // cudaErrCheck(cudaEventRecord(startcublas));
-    // gemm_fp32_cublas(a_fp32, b_fp32, c_gpu_fp32, 1.0, 0.0, m, n, k);
-    // cudaErrCheck(cudaEventRecord(stopcublas));
-    // cudaErrCheck(cudaEventSynchronize(stopcublas));
-    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    // std::cout << "GPU CUBLAS FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32, m*n) << std::endl;
 
     
-    // float *d_gpu_fp32;
-    // cudaErrCheck(cudaMallocManaged(&d_gpu_fp32, m * n * sizeof(float)));
+    float *d_gpu_fp32;
+    cudaErrCheck(cudaMallocManaged(&d_gpu_fp32, m * n * sizeof(float)));
 
-    // for (auto i = 0; i < m*n; i++) d_gpu_fp32[i] = 0.0f;
+    for (auto i = 0; i < m*n; i++) d_gpu_fp32[i] = 0.0f;
 
-    // cudaErrCheck(cudaEventRecord(startcublas));
-    // gemm_fp16_cublas(a_fp16, b_fp16, d_gpu_fp32, 1.0, 0.0, m, n, k);
-    // cudaErrCheck(cudaEventRecord(stopcublas));
-    // cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_fp16_cublas(a_fp16, b_fp16, d_gpu_fp32, 1.0, 0.0, m, n, k);
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
 
-    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    // std::cout << "GPU CUBLAS FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, d_gpu_fp32, m*n) << std::endl;
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU CUBLAS FP16 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, d_gpu_fp32, m*n) << std::endl;
+    cudaErrCheck(cudaFree(d_gpu_fp32));
+
 
     cudaErrCheck(cudaEventDestroy(startcublas));             
     cudaErrCheck(cudaEventDestroy(stopcublas));
@@ -1073,7 +1075,6 @@ int main(){
     cudaErrCheck(cudaFree(c_cpu_fp32));
     cudaErrCheck(cudaFree(a_fp16));
     cudaErrCheck(cudaFree(b_fp16));
-
     cudaErrCheck(cudaDeviceReset());
     return 0;
 }
