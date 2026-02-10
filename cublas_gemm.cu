@@ -276,7 +276,7 @@ void gemm_fp32_cuda_tiled_2D_async(
             for (int c = 0; c < COARSE_FACTOR_2D; c++) {
                 int b_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH;
 
-                constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 1;
+                constexpr size_t pending_batches = 2*(NUM_STAGES_ASYNC_PIPELINE - 1);
                 cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
                 __syncthreads();
 
@@ -1148,7 +1148,7 @@ int main(){
     dim3 gd21((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_fp32_cuda_tiled_2D<<<gd21, bd21>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d_async, 1.0, 0.0, m, n, k);
+    gemm_fp32_cuda_tiled_2D_async<<<gd21, bd21>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d_async, 1.0, 0.0, m, n, k);
     cudaDeviceSynchronize();
     cudaErrCheck(cudaEventRecord(stopcublas));
     cudaErrCheck(cudaEventSynchronize(stopcublas));
