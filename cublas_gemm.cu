@@ -8,7 +8,7 @@ using namespace nvcuda;
 #define WMMA_M 16
 #define WMMA_N 16
 #define WMMA_K 16
-#define NUM_STAGES_ASYNC_PIPELINE 2
+#define NUM_STAGES_ASYNC_PIPELINE 4
 
 
 // Define some error checking macros.
@@ -255,7 +255,7 @@ void gemm_fp32_cuda_tiled_2D_async(
 
     for (int ph = 0; ph < k; ph += TILE_WIDTH) {
         for (int r = 0; r < COARSE_FACTOR_2D; r++) {
-            
+
             for (int s = 0; s < NUM_STAGES_ASYNC_PIPELINE; s++) {
                 int b_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + s*TILE_WIDTH;
 
