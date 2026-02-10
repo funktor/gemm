@@ -280,10 +280,8 @@ void gemm_fp32_cuda_tiled_2D_async(
                 __syncthreads();
 
                 pipeline.producer_acquire();
-                if (curr < COARSE_FACTOR_2D) {
-                    int ub_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + curr*TILE_WIDTH;
-                    cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH, b_fp32 + (ph + ty)*n + ub_col, sizeof(float) * TILE_WIDTH, pipeline);
-                }
+                int ub_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + (curr % COARSE_FACTOR_2D)*TILE_WIDTH;
+                cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH, b_fp32 + (ph + ty)*n + ub_col, sizeof(float) * TILE_WIDTH, pipeline);
                 pipeline.producer_commit();
 
                 stage = (stage + 1) % NUM_STAGES_ASYNC_PIPELINE;
