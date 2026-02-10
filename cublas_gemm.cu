@@ -8,7 +8,7 @@ using namespace nvcuda;
 #define WMMA_M 16
 #define WMMA_N 16
 #define WMMA_K 16
-#define NUM_STAGES_ASYNC_PIPELINE 4
+#define NUM_STAGES_ASYNC_PIPELINE 2
 
 
 // Define some error checking macros.
@@ -270,8 +270,6 @@ void gemm_fp32_cuda_tiled_2D_async(
             Mds[ty*TILE_WIDTH+tx] = a_fp32[row*k + ph + tx];
 
             for (int c = 0; c < COARSE_FACTOR_2D; c++) {
-                int b_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH;
-
                 constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 1;
                 cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
                 __syncthreads();
