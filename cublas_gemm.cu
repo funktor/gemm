@@ -250,7 +250,8 @@ void gemm_fp32_cuda_tiled_2D_async(
     float Pval[COARSE_FACTOR_2D*COARSE_FACTOR_2D];
     for (int r = 0; r < COARSE_FACTOR_2D*COARSE_FACTOR_2D; r++) Pval[r] = 0.0f;
 
-    __shared__ cuda::barrier<cuda::thread_scope_block> bar;
+    using barrier_t = cuda::barrier<cuda::thread_scope_block>;
+    __shared__ barrier_t bar;
 
     if (tx == 0 && ty == 0) init(&bar, bx * by);
     __syncthreads();
