@@ -251,21 +251,20 @@ void gemm_fp32_cuda_tiled_2D_async(
     float Pval[COARSE_FACTOR_2D*COARSE_FACTOR_2D];
     for (int r = 0; r < COARSE_FACTOR_2D*COARSE_FACTOR_2D; r++) Pval[r] = 0.0f;
 
+    cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
+
     for (int ph = 0; ph < k; ph += TILE_WIDTH) {
         for (int r = 0; r < COARSE_FACTOR_2D; r++) {
             int row = row_start + r*TILE_WIDTH;
             Mds[ty*TILE_WIDTH+tx] = a_fp32[row*k + ph + tx];
 
-            cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
-
+            pipeline.producer_acquire();
             for (int s = 0; s < NUM_STAGES_ASYNC_PIPELINE; s++) {
                 int b_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + s*TILE_WIDTH;
-
-                pipeline.producer_acquire();
                 cuda::memcpy_async(Nds[s] + ty*TILE_WIDTH, b_fp32 + (ph + ty)*n + b_col, cuda::aligned_size_t<4>(sizeof(float) * TILE_WIDTH), pipeline);
-                pipeline.producer_commit();
+                
             }
-
+            pipeline.producer_commit();
 
             int stage = 0;
             int curr = NUM_STAGES_ASYNC_PIPELINE;
