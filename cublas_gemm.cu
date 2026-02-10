@@ -262,9 +262,8 @@ void gemm_fp32_cuda_tiled_2D_async(
             pipeline.producer_commit();
         }
 
-        int stage = 0;
-
         for (int r = 0; r < COARSE_FACTOR_2D; r++) {
+            int stage = 0;
             int row = row_start + r*TILE_WIDTH;
 
             Mds[ty*TILE_WIDTH+tx] = a_fp32[row*k + ph + tx];
