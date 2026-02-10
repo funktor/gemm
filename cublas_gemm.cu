@@ -262,8 +262,6 @@ void gemm_fp32_cuda_tiled_2D_async(
             cuda::memcpy_async(Mds + ty*TILE_WIDTH, a_fp32 + row*k + ph, sizeof(float) * TILE_WIDTH, bar);
 
             for (int c = 0; c < COARSE_FACTOR_2D; c++) {
-                int col = col_start + c*TILE_WIDTH;
-
                 int b_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH;
                 cuda::memcpy_async(Nds + ty*TILE_WIDTH, b_fp32 + (ph + ty)*n + b_col, sizeof(float) * TILE_WIDTH, bar);
 
