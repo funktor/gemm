@@ -16,6 +16,7 @@
 #include <cuda_fp16.h>
 #include <cuda/barrier>
 #include <cuda/std/utility>
+#include <cuda/pipeline>
 
 struct __align__(8) half4 {
     half2 a;
