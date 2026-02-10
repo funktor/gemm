@@ -236,8 +236,8 @@ void gemm_fp32_cuda_tiled_2D_async(
     const int n, 
     const int k
 ) {
-    __shared__ float Mds[TILE_WIDTH*TILE_WIDTH];
-    __shared__ float Nds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ alignas(16) float Mds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ alignas(16) float Nds[TILE_WIDTH*TILE_WIDTH];
 
     int bx = blockIdx.x;
     int by = blockIdx.y;
@@ -250,27 +250,28 @@ void gemm_fp32_cuda_tiled_2D_async(
     float Pval[COARSE_FACTOR_2D*COARSE_FACTOR_2D];
     for (int r = 0; r < COARSE_FACTOR_2D*COARSE_FACTOR_2D; r++) Pval[r] = 0.0f;
 
-    auto block = cooperative_groups::this_thread_block();
+    __shared__ cuda::barrier<cuda::thread_scope_block> bar;
+
+    if (tx == 0 && ty == 0) init(&bar, bx * by);
+    __syncthreads();
 
     for (int ph = 0; ph < k; ph += TILE_WIDTH) {
         for (int r = 0; r < COARSE_FACTOR_2D; r++) {
-            for (int j = 0; j < TILE_WIDTH; j++) {
-                int a_row = by*TILE_WIDTH*COARSE_FACTOR_2D + r*TILE_WIDTH + j;
-                int a_col = ph;
-                cooperative_groups::memcpy_async(block, Mds + j*TILE_WIDTH, a_fp32 + a_row*k + ph, sizeof(float)*TILE_WIDTH);
-            }
+            int row = row_start + r*TILE_WIDTH;
+
+            cuda::memcpy_async(Mds + ty*TILE_WIDTH, a_fp32 + row*k + ph, sizeof(float) * TILE_WIDTH, bar);
 
             for (int c = 0; c < COARSE_FACTOR_2D; c++) {
-                for (int j = 0; j < TILE_WIDTH; j++) {
-                    int b_row = ph + j;
-                    int b_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH;
-                    cooperative_groups::memcpy_async(block, Nds + j*TILE_WIDTH, b_fp32 + b_row*n + b_col, sizeof(float)*TILE_WIDTH);
-                }
+                int col = col_start + c*TILE_WIDTH;
 
-                cooperative_groups::wait(block);
+                int b_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH;
+                cuda::memcpy_async(Nds + ty*TILE_WIDTH, b_fp32 + (ph + ty)*n + b_col, sizeof(float) * TILE_WIDTH, bar);
+
+                bar.arrive_and_wait();
+                __syncthreads();
 
                 for (int i = 0; i < TILE_WIDTH; i++) Pval[r*COARSE_FACTOR_2D + c] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx];
-                block.sync();
+                __syncthreads();
             }
         }
     }
