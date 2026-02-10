@@ -8,7 +8,7 @@ using namespace nvcuda;
 #define WMMA_M 16
 #define WMMA_N 16
 #define WMMA_K 16
-#define NUM_STAGES_ASYNC_PIPELINE 2
+#define NUM_STAGES_ASYNC_PIPELINE 4
 
 
 // Define some error checking macros.
@@ -237,7 +237,7 @@ void gemm_fp32_cuda_tiled_2D_async(
     const int n, 
     const int k
 ) {
-    __shared__ alignas(16) float Mds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
+    __shared__ alignas(16) float Mds[TILE_WIDTH*TILE_WIDTH];
     __shared__ alignas(16) float Nds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
 
     int bx = blockIdx.x;
@@ -255,14 +255,10 @@ void gemm_fp32_cuda_tiled_2D_async(
 
     for (int ph = 0; ph < k; ph += TILE_WIDTH) {
         for (int s = 0; s < NUM_STAGES_ASYNC_PIPELINE; s++) {
-            int r = s/COARSE_FACTOR_2D;
             int c = s % COARSE_FACTOR_2D;
-
-            int row = row_start + r*TILE_WIDTH;
             int b_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH;
 
             pipeline.producer_acquire();
-            cuda::memcpy_async(Mds[s] + ty*TILE_WIDTH, a_fp32 + row*k + ph, cuda::aligned_size_t<4>(sizeof(float) * TILE_WIDTH), pipeline);
             cuda::memcpy_async(Nds[s] + ty*TILE_WIDTH, b_fp32 + (ph + ty)*n + b_col, cuda::aligned_size_t<4>(sizeof(float) * TILE_WIDTH), pipeline);
             pipeline.producer_commit();
         }
@@ -273,21 +269,22 @@ void gemm_fp32_cuda_tiled_2D_async(
         for (int r = 0; r < COARSE_FACTOR_2D; r++) {
             int row = row_start + r*TILE_WIDTH;
 
+            Mds[ty*TILE_WIDTH+tx] = a_fp32[row*k + ph + tx];
+
             for (int c = 0; c < COARSE_FACTOR_2D; c++) {
                 int b_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH;
 
-                constexpr size_t pending_batches = 2*(NUM_STAGES_ASYNC_PIPELINE - 1);
+                constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 1;
                 cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
                 __syncthreads();
 
-                for (int i = 0; i < TILE_WIDTH; i++) Pval[r*COARSE_FACTOR_2D + c] += Mds[stage][ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx];
+                for (int i = 0; i < TILE_WIDTH; i++) Pval[r*COARSE_FACTOR_2D + c] += Mds[ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx];
 
                 pipeline.consumer_release();
                 __syncthreads();
 
                 if (curr < COARSE_FACTOR_2D*COARSE_FACTOR_2D) {
                     pipeline.producer_acquire();
-                    cuda::memcpy_async(Mds[stage] + ty*TILE_WIDTH, a_fp32 + row*k + ph, cuda::aligned_size_t<4>(sizeof(float) * TILE_WIDTH), pipeline);
                     cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH, b_fp32 + (ph + ty)*n + b_col, cuda::aligned_size_t<4>(sizeof(float) * TILE_WIDTH), pipeline);
                     pipeline.producer_commit();
                 }
