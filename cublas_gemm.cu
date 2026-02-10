@@ -283,7 +283,7 @@ void gemm_fp32_cuda_tiled_2D_async(
                 pipeline.consumer_release();
                 __syncthreads();
 
-                if (curr < COARSE_FACTOR_2D*COARSE_FACTOR_2D) {
+                if (curr < (COARSE_FACTOR_2D*COARSE_FACTOR_2D)-1) {
                     pipeline.producer_acquire();
                     cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH, b_fp32 + (ph + ty)*n + b_col, cuda::aligned_size_t<4>(sizeof(float) * TILE_WIDTH), pipeline);
                     pipeline.producer_commit();
