@@ -226,6 +226,65 @@ void gemm_fp32_cuda_tiled_2D(
 }
 
 
+void gemm_fp32_cuda_tiled_2D_async(
+    const float *a_fp32, 
+    const float *b_fp32, 
+    float *c_fp32, 
+    const float alpha, 
+    const float beta, 
+    const int m, 
+    const int n, 
+    const int k
+) {
+    __shared__ float Mds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ float Nds[TILE_WIDTH*TILE_WIDTH];
+
+    int bx = blockIdx.x;
+    int by = blockIdx.y;
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+
+    int row_start = by*TILE_WIDTH*COARSE_FACTOR_2D + ty;
+    int col_start = bx*TILE_WIDTH*COARSE_FACTOR_2D + tx;
+
+    float Pval[COARSE_FACTOR_2D*COARSE_FACTOR_2D];
+    for (int r = 0; r < COARSE_FACTOR_2D*COARSE_FACTOR_2D; r++) Pval[r] = 0.0f;
+
+    auto block = cooperative_groups::this_thread_block();
+
+    for (int ph = 0; ph < k; ph += TILE_WIDTH) {
+        for (int r = 0; r < COARSE_FACTOR_2D; r++) {
+            for (int j = 0; j < TILE_WIDTH; j++) {
+                int a_row = by*TILE_WIDTH*COARSE_FACTOR_2D + r*TILE_WIDTH + j;
+                int a_col = ph;
+                cooperative_groups::memcpy_async(block, Mds + j*TILE_WIDTH, a_fp32 + a_row*k + ph, sizeof(float)*TILE_WIDTH);
+            }
+
+            for (int c = 0; c < COARSE_FACTOR_2D; c++) {
+                for (int j = 0; j < TILE_WIDTH; j++) {
+                    int b_row = ph + j;
+                    int b_col = bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH;
+                    cooperative_groups::memcpy_async(block, Nds + j*TILE_WIDTH, b_fp32 + b_row*n + b_col, sizeof(float)*TILE_WIDTH);
+                }
+
+                cooperative_groups::wait(block);
+
+                for (int i = 0; i < TILE_WIDTH; i++) Pval[r*COARSE_FACTOR_2D + c] += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx];
+                block.sync();
+            }
+        }
+    }
+
+    for (int r = 0; r < COARSE_FACTOR_2D; r++) {
+        int row = row_start + r*TILE_WIDTH;
+        for (int c = 0; c < COARSE_FACTOR_2D; c++) {
+            int col = col_start + c*TILE_WIDTH;
+            if (row < m && col < n) c_fp32[row*n+col] = alpha * Pval[r*COARSE_FACTOR_2D + c] + beta * c_fp32[row*n+col];
+        }
+    }
+}
+
+
 __global__
 void gemm_fp32_cuda_tiled_2D_vectorize(
     float *a_fp32, 
@@ -1054,6 +1113,26 @@ int main(){
     std::cout << "GPU CUDA TILED 2D FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
     std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d, m*n) << std::endl;
     cudaErrCheck(cudaFree(c_gpu_fp32_tiled_2d));
+
+
+
+    float *c_gpu_fp32_tiled_2d_async;
+    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled_2d_async, m * n * sizeof(float)));
+
+    for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_async[i] = 0.0f;
+
+    dim3 bd21(32, 32, 1);
+    dim3 gd21((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
+
+    cudaErrCheck(cudaEventRecord(startcublas));
+    gemm_fp32_cuda_tiled_2D<<<gd21, bd21>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d_async, 1.0, 0.0, m, n, k);
+    cudaDeviceSynchronize();
+    cudaErrCheck(cudaEventRecord(stopcublas));
+    cudaErrCheck(cudaEventSynchronize(stopcublas));
+    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    std::cout << "GPU CUDA TILED 2D ASYNC FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d_async, m*n) << std::endl;
+    cudaErrCheck(cudaFree(c_gpu_fp32_tiled_2d_async));
 
 
 

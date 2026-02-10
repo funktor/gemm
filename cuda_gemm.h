@@ -14,6 +14,8 @@
 #include <cublas_v2.h>
 #include <mma.h>
 #include <cuda_fp16.h>
+#include <cooperative_groups.h>
+#include <cooperative_groups/memcpy_async.h>
 
 struct __align__(8) half4 {
     half2 a;
