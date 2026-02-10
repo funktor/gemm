@@ -225,7 +225,7 @@ void gemm_fp32_cuda_tiled_2D(
     }
 }
 
-
+__global__
 void gemm_fp32_cuda_tiled_2D_async(
     const float *a_fp32, 
     const float *b_fp32, 
