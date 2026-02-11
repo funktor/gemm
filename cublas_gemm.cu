@@ -273,6 +273,7 @@ void gemm_fp32_cuda_tiled_2D_async(
             int s = NUM_STAGES_ASYNC_PIPELINE;
 
             float Pval[32];
+            for (int j = 0; j < 32; j++) Pval[j] = 0.0f;
 
             for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                 constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 1;
@@ -282,7 +283,6 @@ void gemm_fp32_cuda_tiled_2D_async(
                 __syncthreads();
 
                 for (int j = 0; j < 32; j++) {
-                    Pval[j] = 0.0f;
                     for (int i = 0; i < TILE_WIDTH; i++) Pval[j] += Mds[stage][ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+j];
                 }
 
