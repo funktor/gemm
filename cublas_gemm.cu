@@ -268,7 +268,7 @@ void gemm_fp32_cuda_tiled_2D_async(
             float res = 0.0f;
 
             for (int ph = 0; ph < k; ph += TILE_WIDTH) {
-                constexpr size_t pending_batches = 2*(NUM_STAGES_ASYNC_PIPELINE - 1);
+                constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 2;
                 cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
                 __syncthreads();
 
