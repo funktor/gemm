@@ -257,7 +257,7 @@ void gemm_fp32_cuda_tiled_2D_async(
             
             for (int s = 0; s < NUM_STAGES_ASYNC_PIPELINE; s++) {
                 pipeline.producer_acquire();
-                cuda::memcpy_async(Mds[s] + ty*TILE_WIDTH + tx*4, a_fp32 + row*k + s*TILE_WIDTH + tx, cuda::aligned_size_t<4>(sizeof(float)*4), pipeline);
+                cuda::memcpy_async(Mds[s] + ty*TILE_WIDTH + tx*4, a_fp32 + row*k + s*TILE_WIDTH + tx*4, cuda::aligned_size_t<4>(sizeof(float)*4), pipeline);
                 cuda::memcpy_async(Nds[s] + ty*TILE_WIDTH + tx*4, b_fp32 + (s*TILE_WIDTH + ty)*n + col, cuda::aligned_size_t<4>(sizeof(float)*4), pipeline);
                 pipeline.producer_commit();
             }
