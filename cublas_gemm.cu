@@ -288,11 +288,15 @@ void gemm_fp32_cuda_tiled_2D_async(
                 __syncthreads();
 
                 mds_pipeline.producer_acquire();
-                cuda::memcpy_async(Mds[stage] + ty*TILE_WIDTH + tx, a_fp32 + row*k + s*TILE_WIDTH + tx, cuda::aligned_size_t<4>(sizeof(float)), mds_pipeline);
+                if (s*TILE_WIDTH + tx < k) {
+                    cuda::memcpy_async(Mds[stage] + ty*TILE_WIDTH + tx, a_fp32 + row*k + s*TILE_WIDTH + tx, cuda::aligned_size_t<4>(sizeof(float)), mds_pipeline);
+                }
                 mds_pipeline.producer_commit();
 
                 nds_pipeline.producer_acquire();
-                cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH + tx, b_fp32 + (s*TILE_WIDTH + ty)*n + col, cuda::aligned_size_t<4>(sizeof(float)), nds_pipeline);
+                if (s*TILE_WIDTH + ty < k) {
+                    cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH + tx, b_fp32 + (s*TILE_WIDTH + ty)*n + col, cuda::aligned_size_t<4>(sizeof(float)), nds_pipeline);
+                }
                 nds_pipeline.producer_commit();
 
                 stage = (stage + 1) % NUM_STAGES_ASYNC_PIPELINE;
