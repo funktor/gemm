@@ -1028,7 +1028,7 @@ void convertFp32ToFp16 (half *out, const float *in, const long n) {
 int main(){
     int m = 4096;
     int n = 4096;
-    int k = 4096;
+    int k = 1024;
 
     float *a_fp32;
     float *b_fp32;
@@ -1136,7 +1136,7 @@ int main(){
 
     for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_async[i] = 0.0f;
 
-    dim3 bd21(32, 32, 1);
+    dim3 bd21(8, 32, 1);
     dim3 gd21((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
