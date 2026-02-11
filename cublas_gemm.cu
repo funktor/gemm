@@ -283,7 +283,7 @@ void gemm_fp32_cuda_tiled_2D_async(
                 __syncthreads();
 
 
-                for (int i = 0; i < TILE_WIDTH; i++) res += Mds[stage][ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx];
+                for (int i = 0; i < TILE_WIDTH; i++) res += Mds[ty*TILE_WIDTH+i]*Nds[i*TILE_WIDTH+tx];
                 __syncthreads();
 
                 // mds_pipeline.consumer_release();
