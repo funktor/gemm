@@ -1028,7 +1028,7 @@ void convertFp32ToFp16 (half *out, const float *in, const long n) {
 int main(){
     int m = 4096;
     int n = 4096;
-    int k = 1024;
+    int k = 4096;
 
     float *a_fp32;
     float *b_fp32;
