@@ -8,7 +8,7 @@ using namespace nvcuda;
 #define WMMA_M 16
 #define WMMA_N 16
 #define WMMA_K 16
-#define NUM_STAGES_ASYNC_PIPELINE 8
+#define NUM_STAGES_ASYNC_PIPELINE 2
 
 
 // Define some error checking macros.
