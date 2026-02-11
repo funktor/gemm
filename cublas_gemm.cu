@@ -258,11 +258,11 @@ void gemm_fp32_cuda_tiled_2D_async(
 
             for (int s = 0; s < NUM_STAGES_ASYNC_PIPELINE; s++) {
                 mds_pipeline.producer_acquire();
-                cuda::memcpy_async(Mds[s] + ty*TILE_WIDTH, a_fp32 + row*k + s*TILE_WIDTH, sizeof(float) * TILE_WIDTH, pipeline);
+                cuda::memcpy_async(Mds[s] + ty*TILE_WIDTH, a_fp32 + row*k + s*TILE_WIDTH, sizeof(float) * TILE_WIDTH, mds_pipeline);
                 mds_pipeline.producer_commit();
 
                 nds_pipeline.producer_acquire();
-                cuda::memcpy_async(Nds[s] + ty*TILE_WIDTH, b_fp32 + (s*TILE_WIDTH + ty)*n + col, sizeof(float) * TILE_WIDTH, pipeline);
+                cuda::memcpy_async(Nds[s] + ty*TILE_WIDTH, b_fp32 + (s*TILE_WIDTH + ty)*n + col, sizeof(float) * TILE_WIDTH, nds_pipeline);
                 nds_pipeline.producer_commit();
             }
 
@@ -286,13 +286,13 @@ void gemm_fp32_cuda_tiled_2D_async(
 
                 mds_pipeline.producer_acquire();
                 if (s*TILE_WIDTH < k) {
-                    cuda::memcpy_async(Mds[stage] + ty*TILE_WIDTH, a_fp32 + row_start*k + s*TILE_WIDTH, sizeof(float) * TILE_WIDTH, pipeline);
+                    cuda::memcpy_async(Mds[stage] + ty*TILE_WIDTH, a_fp32 + row_start*k + s*TILE_WIDTH, sizeof(float) * TILE_WIDTH, mds_pipeline);
                 }
                 mds_pipeline.producer_commit();
 
                 nds_pipeline.producer_acquire();
                 if (s*TILE_WIDTH < k) {
-                    cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH, b_fp32 + (s*TILE_WIDTH + ty)*n + col_start, sizeof(float) * TILE_WIDTH, pipeline);
+                    cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH, b_fp32 + (s*TILE_WIDTH + ty)*n + col_start, sizeof(float) * TILE_WIDTH, nds_pipeline);
                 }
                 nds_pipeline.producer_commit();
 
