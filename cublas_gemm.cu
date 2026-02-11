@@ -248,47 +248,105 @@ void gemm_fp32_cuda_tiled_2D_async(
     int row_start = by*TILE_WIDTH*COARSE_FACTOR_2D + ty;
     int col_start = bx*TILE_WIDTH*COARSE_FACTOR_2D + tx;
 
-    for (int r = 0; r < COARSE_FACTOR_2D; r++) {
-        int row = row_start + r*TILE_WIDTH;
-        for (int c = 0; c < COARSE_FACTOR_2D; c++) {
-            int col = col_start + c*TILE_WIDTH;
+    float Pval[COARSE_FACTOR_2D*COARSE_FACTOR_2D];
+    for (int r = 0; r < COARSE_FACTOR_2D*COARSE_FACTOR_2D; r++) Pval[r] = 0.0f;
 
-            cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
+    for (int ph = 0; ph < k; ph += TILE_WIDTH) {
+        cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
             
-            for (int s = 0; s < NUM_STAGES_ASYNC_PIPELINE; s++) {
-                pipeline.producer_acquire();
-                cuda::memcpy_async(Mds[s] + ty*TILE_WIDTH + tx, a_fp32 + row*k + s*TILE_WIDTH + tx, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
-                cuda::memcpy_async(Nds[s] + ty*TILE_WIDTH + tx, b_fp32 + (s*TILE_WIDTH + ty)*n + col, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
-                pipeline.producer_commit();
-            }
+        for (int s = 0; s < NUM_STAGES_ASYNC_PIPELINE; s++) {
+            int row = row_start + s*TILE_WIDTH;
+            int col = col_start + s*TILE_WIDTH;
 
-            int stage = 0;
-            int s = NUM_STAGES_ASYNC_PIPELINE;
+            pipeline.producer_acquire();
+            cuda::memcpy_async(Mds[s] + ty*TILE_WIDTH + tx, a_fp32 + row*k + ph + tx, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
+            cuda::memcpy_async(Nds[s] + ty*TILE_WIDTH + tx, b_fp32 + (ph + ty)*n + col, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
+            pipeline.producer_commit();
+        }
 
-            float res = 0.0f;
+        int stage = 0;
+        int s = NUM_STAGES_ASYNC_PIPELINE;
 
-            for (int ph = 0; ph < k; ph += TILE_WIDTH) {
+        for (int r = 0; r < COARSE_FACTOR_2D; r++) {
+            int row = row_start + r*TILE_WIDTH;
+
+            for (int c = 0; c < COARSE_FACTOR_2D; c++) {
+                int col = col_start + c*TILE_WIDTH;
+
                 constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 2;
                 cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
                 __syncthreads();
 
-                for (int i = 0; i < TILE_WIDTH; i++) res += Mds[stage][ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx];
-
+                for (int i = 0; i < TILE_WIDTH; i++) Pval[r*COARSE_FACTOR_2D + c] += Mds[stage][ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx];
+                
                 pipeline.consumer_release();
                 __syncthreads();
 
                 pipeline.producer_acquire();
-                if (s*TILE_WIDTH + tx < k) cuda::memcpy_async(Mds[stage] + ty*TILE_WIDTH + tx, a_fp32 + row*k + s*TILE_WIDTH + tx, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
-                if (s*TILE_WIDTH + ty < k) cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH + tx, b_fp32 + (s*TILE_WIDTH + ty)*n + col, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
+                if (s*TILE_WIDTH + tx < k) cuda::memcpy_async(Mds[stage] + ty*TILE_WIDTH + tx, a_fp32 + row*k + ph + tx, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
+                if (s*TILE_WIDTH + ty < k) cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH + tx, b_fp32 + (ph + ty)*n + col, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
                 pipeline.producer_commit();
 
                 stage = (stage + 1) % NUM_STAGES_ASYNC_PIPELINE;
                 s += 1;
             }
-
-            c_fp32[row*n+col] = alpha * res + beta * c_fp32[row*n+col];
         }
     }
+
+    for (int r = 0; r < COARSE_FACTOR_2D; r++) {
+        int row = row_start + r*TILE_WIDTH;
+        for (int c = 0; c < COARSE_FACTOR_2D; c++) {
+            int col = col_start + c*TILE_WIDTH;
+            if (row < m && col < n) c_fp32[row*n+col] = alpha * Pval[r*COARSE_FACTOR_2D + c] + beta * c_fp32[row*n+col];
+        }
+    }
+
+
+
+
+
+
+    // for (int r = 0; r < COARSE_FACTOR_2D; r++) {
+    //     int row = row_start + r*TILE_WIDTH;
+    //     for (int c = 0; c < COARSE_FACTOR_2D; c++) {
+    //         int col = col_start + c*TILE_WIDTH;
+
+    //         cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
+            
+    //         for (int s = 0; s < NUM_STAGES_ASYNC_PIPELINE; s++) {
+    //             pipeline.producer_acquire();
+    //             cuda::memcpy_async(Mds[s] + ty*TILE_WIDTH + tx, a_fp32 + row*k + s*TILE_WIDTH + tx, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
+    //             cuda::memcpy_async(Nds[s] + ty*TILE_WIDTH + tx, b_fp32 + (s*TILE_WIDTH + ty)*n + col, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
+    //             pipeline.producer_commit();
+    //         }
+
+    //         int stage = 0;
+    //         int s = NUM_STAGES_ASYNC_PIPELINE;
+
+    //         float res = 0.0f;
+
+    //         for (int ph = 0; ph < k; ph += TILE_WIDTH) {
+    //             constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 2;
+    //             cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
+    //             __syncthreads();
+
+    //             for (int i = 0; i < TILE_WIDTH; i++) res += Mds[stage][ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx];
+
+    //             pipeline.consumer_release();
+    //             __syncthreads();
+
+    //             pipeline.producer_acquire();
+    //             if (s*TILE_WIDTH + tx < k) cuda::memcpy_async(Mds[stage] + ty*TILE_WIDTH + tx, a_fp32 + row*k + s*TILE_WIDTH + tx, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
+    //             if (s*TILE_WIDTH + ty < k) cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH + tx, b_fp32 + (s*TILE_WIDTH + ty)*n + col, cuda::aligned_size_t<4>(sizeof(float)), pipeline);
+    //             pipeline.producer_commit();
+
+    //             stage = (stage + 1) % NUM_STAGES_ASYNC_PIPELINE;
+    //             s += 1;
+    //         }
+
+    //         c_fp32[row*n+col] = alpha * res + beta * c_fp32[row*n+col];
+    //     }
+    // }
 }
 
 
@@ -1018,9 +1076,9 @@ void convertFp32ToFp16 (half *out, const float *in, const long n) {
 }
 
 int main(){
-    int m = 2048;
-    int n = 2048;
-    int k = 2048;
+    int m = 4096;
+    int n = 4096;
+    int k = 4096;
 
     float *a_fp32;
     float *b_fp32;
