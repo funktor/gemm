@@ -268,7 +268,7 @@ void gemm_fp32_cuda_tiled_2D_async(
             float res[4] = {0.0f};
 
             for (int ph = 0; ph < k; ph += TILE_WIDTH) {
-                constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 2;
+                constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 1;
                 cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
                 __syncthreads();
 
@@ -315,6 +315,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
     constexpr auto scope = cuda::thread_scope_block;
     cuda::std::size_t producer_count = 32;
     __shared__ cuda::pipeline_shared_state<scope, NUM_STAGES_ASYNC_PIPELINE> shared_state;
+    cuda::pipeline<cuda::thread_scope_block> pipe = cuda::make_pipeline(block, &shared_state, producer_count);
 
     __shared__ alignas(16) float Mds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
     __shared__ alignas(16) float Nds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
@@ -332,8 +333,6 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
         int row = row_start + r*TILE_WIDTH;
         for (int c = 0; c < COARSE_FACTOR_2D; c++) {
             int col = col_start + c*TILE_WIDTH;
-
-            cuda::pipeline<cuda::thread_scope_block> pipe = cuda::make_pipeline(block, &shared_state, producer_count);
             float res[4] = {0.0f};
 
             if (tid < producer_count) {
@@ -358,6 +357,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                         res[2] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
                         res[3] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
                     }
+                    __syncthreads();
                     pipe.consumer_release();
                     s += 1;
                 }
@@ -1224,23 +1224,23 @@ int main(){
 
 
 
-    float *c_gpu_fp32_tiled_2d_async_warp_spl;
-    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled_2d_async_warp_spl, m * n * sizeof(float)));
+    // float *c_gpu_fp32_tiled_2d_async_warp_spl;
+    // cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled_2d_async_warp_spl, m * n * sizeof(float)));
 
-    for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_async_warp_spl[i] = 0.0f;
+    // for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_async_warp_spl[i] = 0.0f;
 
-    dim3 bd22(8, 36, 1);
-    dim3 gd22((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
+    // dim3 bd22(8, 36, 1);
+    // dim3 gd22((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
 
-    cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_fp32_cuda_tiled_2D_async_warp_spl<<<gd22, bd22>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d_async_warp_spl, 1.0, 0.0, m, n, k);
-    cudaDeviceSynchronize();
-    cudaErrCheck(cudaEventRecord(stopcublas));
-    cudaErrCheck(cudaEventSynchronize(stopcublas));
-    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    std::cout << "GPU CUDA TILED 2D ASYNC WARP SPL FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d_async_warp_spl, m*n) << std::endl;
-    cudaErrCheck(cudaFree(c_gpu_fp32_tiled_2d_async_warp_spl));
+    // cudaErrCheck(cudaEventRecord(startcublas));
+    // gemm_fp32_cuda_tiled_2D_async_warp_spl<<<gd22, bd22>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d_async_warp_spl, 1.0, 0.0, m, n, k);
+    // cudaDeviceSynchronize();
+    // cudaErrCheck(cudaEventRecord(stopcublas));
+    // cudaErrCheck(cudaEventSynchronize(stopcublas));
+    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    // std::cout << "GPU CUDA TILED 2D ASYNC WARP SPL FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d_async_warp_spl, m*n) << std::endl;
+    // cudaErrCheck(cudaFree(c_gpu_fp32_tiled_2d_async_warp_spl));
 
 
     float *c_gpu_fp32_tiled_2d_vec;
