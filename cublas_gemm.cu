@@ -359,9 +359,9 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                         res[2] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
                         res[3] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
                     }
-                    auto consumer_group = cg::tiled_partition<32>(block); // Example sub-group
-                    cg::sync(consumer_group);
-                    
+                    auto consumer_group = cooperative_groups::tiled_partition<32>(block); // Example sub-group
+                    cooperative_groups::sync(consumer_group);
+
                     pipe.consumer_release();
                     s += 1;
                 }
