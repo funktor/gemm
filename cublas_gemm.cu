@@ -348,6 +348,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
             }
             else {
                 int s = 0;
+                float res[4] = {0.0f};
                 for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                     int stage = s % NUM_STAGES_ASYNC_PIPELINE;
                     pipe.consumer_wait();
