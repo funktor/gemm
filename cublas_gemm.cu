@@ -324,7 +324,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
     int tx = threadIdx.x;
     int ty = threadIdx.y;
 
-    int row_start = by*TILE_WIDTH*COARSE_FACTOR_2D + ty;
+    int row_start = by*TILE_WIDTH*COARSE_FACTOR_2D + ty+4;
     int col_start = bx*TILE_WIDTH*COARSE_FACTOR_2D + tx*4;
     int tid = block.thread_rank();
 
@@ -344,16 +344,16 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                 if (tid < producer_count) {
                     pipe.producer_acquire();
                     cuda::memcpy_async(Mds[stage] + tid*TILE_WIDTH, a_fp32 + row*k + ph, cuda::aligned_size_t<4>(sizeof(float)*32), pipe);
-                    cuda::memcpy_async(Nds[stage] + tid*TILE_WIDTH, b_fp32 + (ph + ty)*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH, cuda::aligned_size_t<4>(sizeof(float)*32), pipe);
+                    cuda::memcpy_async(Nds[stage] + tid*TILE_WIDTH, b_fp32 + (ph + ty + 4)*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH, cuda::aligned_size_t<4>(sizeof(float)*32), pipe);
                     pipe.producer_commit();
                 }
                 else {
                     pipe.consumer_wait();
                     for (int i = 0; i < TILE_WIDTH; i++) {
-                        res[0] += Mds[stage][ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+0];
-                        res[1] += Mds[stage][ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+1];
-                        res[2] += Mds[stage][ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
-                        res[3] += Mds[stage][ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
+                        res[0] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+0];
+                        res[1] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+1];
+                        res[2] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
+                        res[3] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
                     }
                     __syncthreads();
                     pipe.consumer_release();
@@ -1228,7 +1228,7 @@ int main(){
 
     for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_async_warp_spl[i] = 0.0f;
 
-    dim3 bd22(8, 32, 1);
+    dim3 bd22(8, 36, 1);
     dim3 gd22((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
