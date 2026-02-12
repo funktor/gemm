@@ -328,7 +328,8 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
     int tid = block.thread_rank();
     int warp_id = tid/32;
 
-    cuda::pipeline pipe = cuda::make_pipeline(block, &shared_state);
+    cuda::pipeline_role role = (warp_id == 0) ? cuda::pipeline_role::producer : cuda::pipeline_role::consumer;
+    cuda::pipeline pipe = cuda::make_pipeline(block, &shared_state, 32);
 
     for (int r = 0; r < COARSE_FACTOR_2D; r++) {
         int row = row_start + r*TILE_WIDTH;
