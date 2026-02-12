@@ -334,6 +334,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
         int row = row_start + r*TILE_WIDTH;
         for (int c = 0; c < COARSE_FACTOR_2D; c++) {
             int col = col_start + c*TILE_WIDTH;
+            float res[4] = {0.0f};
 
             if (warp_id == 0) {
                 int s = 0;
@@ -349,30 +350,24 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
             else {
                 auto consumer_group = cooperative_groups::tiled_partition<32>(block);
                 int s = 0;
-
                 for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                     int stage = s % NUM_STAGES_ASYNC_PIPELINE;
                     pipe.consumer_wait();
-                    for (int r1 = ty; r1 < 36; r1 += 28) {
-                        float res[4] = {0.0f};
-                        for (int i = 0; i < TILE_WIDTH; i++) {
-                            res[0] += Mds[stage][(r1 % 32)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+0];
-                            res[1] += Mds[stage][(r1 % 32)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+1];
-                            res[2] += Mds[stage][(r1 % 32)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
-                            res[3] += Mds[stage][(r1 % 32)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
-                        }
-
-                        int row_off = by*TILE_WIDTH*COARSE_FACTOR_2D + r*TILE_WIDTH + r1 % 32;
-
-                        c_fp32[row_off*n+col+0] = alpha * res[0] + beta * c_fp32[row_off*n+col+0];
-                        c_fp32[row_off*n+col+1] = alpha * res[1] + beta * c_fp32[row_off*n+col+1];
-                        c_fp32[row_off*n+col+2] = alpha * res[2] + beta * c_fp32[row_off*n+col+2];
-                        c_fp32[row_off*n+col+3] = alpha * res[3] + beta * c_fp32[row_off*n+col+3];
+                    for (int i = 0; i < TILE_WIDTH; i++) {
+                        res[0] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+0];
+                        res[1] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+1];
+                        res[2] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
+                        res[3] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
                     }
                     cooperative_groups::sync(consumer_group);
                     pipe.consumer_release();
                     s += 1;
                 }
+
+                c_fp32[(row - 4)*n+col+0] = alpha * res[0] + beta * c_fp32[(row - 4)*n+col+0];
+                c_fp32[(row - 4)*n+col+1] = alpha * res[1] + beta * c_fp32[(row - 4)*n+col+1];
+                c_fp32[(row - 4)*n+col+2] = alpha * res[2] + beta * c_fp32[(row - 4)*n+col+2];
+                c_fp32[(row - 4)*n+col+3] = alpha * res[3] + beta * c_fp32[(row - 4)*n+col+3];
             }
         }
     }
@@ -1236,7 +1231,7 @@ int main(){
 
     for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_async_warp_spl[i] = 0.0f;
 
-    dim3 bd22(8, 32, 1);
+    dim3 bd22(8, 36, 1);
     dim3 gd22((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
