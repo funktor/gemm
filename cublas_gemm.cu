@@ -314,7 +314,6 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
     auto block = cooperative_groups::this_thread_block();
     constexpr auto scope = cuda::thread_scope_block;
     __shared__ cuda::pipeline_shared_state<scope, NUM_STAGES_ASYNC_PIPELINE> shared_state;
-    cuda::pipeline<cuda::thread_scope_block> pipe = cuda::make_pipeline(block, &shared_state);
 
     __shared__ alignas(16) float Mds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
     __shared__ alignas(16) float Nds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
@@ -329,13 +328,16 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
     int tid = block.thread_rank();
     int warp_id = tid/32;
 
+    cuda::pipeline_role role = (warp_id == 0) ? cuda::pipeline_role::producer : cuda::pipeline_role::consumer;
+    cuda::pipeline pipe = cuda::make_pipeline(block, &shared_state, role);
+
     for (int r = 0; r < COARSE_FACTOR_2D; r++) {
         int row = row_start + r*TILE_WIDTH;
         for (int c = 0; c < COARSE_FACTOR_2D; c++) {
             int col = col_start + c*TILE_WIDTH;
             float res[4] = {0.0f};
 
-            if (warp_id == 0) {
+            if (role == cuda::pipeline_role::producer) {
                 int s = 0;
                 for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                     int stage = s % NUM_STAGES_ASYNC_PIPELINE;
@@ -357,7 +359,9 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                         res[2] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
                         res[3] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
                     }
-                    __syncthreads();
+                    auto consumer_group = cg::tiled_partition<32>(block); // Example sub-group
+                    cg::sync(consumer_group);
+                    
                     pipe.consumer_release();
                     s += 1;
                 }
