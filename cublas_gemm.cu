@@ -351,15 +351,15 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                 auto consumer_group = cooperative_groups::tiled_partition<32>(block);
                 int s = 0;
 
-                for (int r1 = ty; r1 < 32; r1 += 28) {
+                for (int r1 = ty; r1 < 36; r1 += 28) {
                     for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                         int stage = s % NUM_STAGES_ASYNC_PIPELINE;
                         pipe.consumer_wait();
                         for (int i = 0; i < TILE_WIDTH; i++) {
-                            res[0] += Mds[stage][r1*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+0];
-                            res[1] += Mds[stage][r1*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+1];
-                            res[2] += Mds[stage][r1*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
-                            res[3] += Mds[stage][r1*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
+                            res[0] += Mds[stage][(r1 % 32)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+0];
+                            res[1] += Mds[stage][(r1 % 32)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+1];
+                            res[2] += Mds[stage][(r1 % 32)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
+                            res[3] += Mds[stage][(r1 % 32)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
                         }
                         cooperative_groups::sync(consumer_group);
                         pipe.consumer_release();
