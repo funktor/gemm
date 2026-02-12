@@ -334,6 +334,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
             int col = col_start + c*TILE_WIDTH;
 
             cuda::pipeline<cuda::thread_scope_block> pipe = cuda::make_pipeline(block, &shared_state, producer_count);
+            float res[4] = {0.0f};
 
             if (tid < producer_count) {
                 int s = 0;
@@ -348,7 +349,6 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
             }
             else {
                 int s = 0;
-                float res[4] = {0.0f};
                 for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                     int stage = s % NUM_STAGES_ASYNC_PIPELINE;
                     pipe.consumer_wait();
