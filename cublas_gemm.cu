@@ -328,6 +328,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
     int row_start = by*TILE_WIDTH*COARSE_FACTOR_2D + ty+4;
     int col_start = bx*TILE_WIDTH*COARSE_FACTOR_2D + tx*4;
     int tid = block.thread_rank();
+    int warp_id = tid/32;
 
     for (int r = 0; r < COARSE_FACTOR_2D; r++) {
         int row = row_start + r*TILE_WIDTH;
@@ -335,7 +336,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
             int col = col_start + c*TILE_WIDTH;
             float res[4] = {0.0f};
 
-            if (tid < producer_count) {
+            if (warp_id == 0) {
                 int s = 0;
                 for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                     int stage = s % NUM_STAGES_ASYNC_PIPELINE;
@@ -1229,7 +1230,7 @@ int main(){
 
     for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_async_warp_spl[i] = 0.0f;
 
-    dim3 bd22(8, 32, 1);
+    dim3 bd22(8, 36, 1);
     dim3 gd22((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
