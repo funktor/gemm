@@ -1228,23 +1228,23 @@ int main(){
 
 
 
-    float *c_gpu_fp32_tiled_2d_async_warp_spl;
-    cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled_2d_async_warp_spl, m * n * sizeof(float)));
+    // float *c_gpu_fp32_tiled_2d_async_warp_spl;
+    // cudaErrCheck(cudaMallocManaged(&c_gpu_fp32_tiled_2d_async_warp_spl, m * n * sizeof(float)));
 
-    for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_async_warp_spl[i] = 0.0f;
+    // for (auto i = 0; i < m*n; i++) c_gpu_fp32_tiled_2d_async_warp_spl[i] = 0.0f;
 
-    dim3 bd22(8, 36, 1);
-    dim3 gd22((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
+    // dim3 bd22(8, 36, 1);
+    // dim3 gd22((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
 
-    cudaErrCheck(cudaEventRecord(startcublas));
-    gemm_fp32_cuda_tiled_2D_async_warp_spl<<<gd22, bd22>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d_async_warp_spl, 1.0, 0.0, m, n, k);
-    cudaDeviceSynchronize();
-    cudaErrCheck(cudaEventRecord(stopcublas));
-    cudaErrCheck(cudaEventSynchronize(stopcublas));
-    cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
-    std::cout << "GPU CUDA TILED 2D ASYNC WARP SPL FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
-    std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d_async_warp_spl, m*n) << std::endl;
-    cudaErrCheck(cudaFree(c_gpu_fp32_tiled_2d_async_warp_spl));
+    // cudaErrCheck(cudaEventRecord(startcublas));
+    // gemm_fp32_cuda_tiled_2D_async_warp_spl<<<gd22, bd22>>>(a_fp32, b_fp32, c_gpu_fp32_tiled_2d_async_warp_spl, 1.0, 0.0, m, n, k);
+    // cudaDeviceSynchronize();
+    // cudaErrCheck(cudaEventRecord(stopcublas));
+    // cudaErrCheck(cudaEventSynchronize(stopcublas));
+    // cudaErrCheck(cudaEventElapsedTime(&cublasTime, startcublas, stopcublas));
+    // std::cout << "GPU CUDA TILED 2D ASYNC WARP SPL FP32 GEMM Duration = " << cublasTime << " ms" << std::endl;
+    // std::cout << "Matrices matching = " << compare_matrices(c_cpu_fp32, c_gpu_fp32_tiled_2d_async_warp_spl, m*n) << std::endl;
+    // cudaErrCheck(cudaFree(c_gpu_fp32_tiled_2d_async_warp_spl));
 
 
     float *c_gpu_fp32_tiled_2d_vec;
