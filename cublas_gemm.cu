@@ -313,9 +313,8 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
 ) {
     auto block = cooperative_groups::this_thread_block();
     constexpr auto scope = cuda::thread_scope_block;
-    cuda::std::size_t producer_count = 32;
     __shared__ cuda::pipeline_shared_state<scope, NUM_STAGES_ASYNC_PIPELINE> shared_state;
-    cuda::pipeline<cuda::thread_scope_block> pipe = cuda::make_pipeline(block, &shared_state, producer_count);
+    cuda::pipeline<cuda::thread_scope_block> pipe = cuda::make_pipeline(block, &shared_state);
 
     __shared__ alignas(16) float Mds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
     __shared__ alignas(16) float Nds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
