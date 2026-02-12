@@ -313,7 +313,9 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
 ) {
     auto block = cooperative_groups::this_thread_block();
     constexpr auto scope = cuda::thread_scope_block;
+    cuda::std::size_t producer_count = 32;
     __shared__ cuda::pipeline_shared_state<scope, NUM_STAGES_ASYNC_PIPELINE> shared_state;
+    cuda::pipeline<cuda::thread_scope_block> pipe = cuda::make_pipeline(block, &shared_state, producer_count);
 
     __shared__ alignas(16) float Mds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
     __shared__ alignas(16) float Nds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
@@ -327,9 +329,6 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
     int col_start = bx*TILE_WIDTH*COARSE_FACTOR_2D + tx*4;
     int tid = block.thread_rank();
     int warp_id = tid/32;
-
-    cuda::pipeline_role role = (warp_id == 0) ? cuda::pipeline_role::producer : cuda::pipeline_role::consumer;
-    cuda::pipeline pipe = cuda::make_pipeline(block, &shared_state, 32);
 
     for (int r = 0; r < COARSE_FACTOR_2D; r++) {
         int row = row_start + r*TILE_WIDTH;
@@ -349,6 +348,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                 }
             }
             else {
+                auto consumer_group = cooperative_groups::tiled_partition<32>(block);
                 int s = 0;
                 for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                     int stage = s % NUM_STAGES_ASYNC_PIPELINE;
@@ -359,8 +359,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                         res[2] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
                         res[3] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
                     }
-                    // auto consumer_group = cooperative_groups::tiled_partition<32>(block); // Example sub-group
-                    // cooperative_groups::sync(consumer_group);
+                    cooperative_groups::sync(consumer_group);
                     pipe.consumer_release();
                     s += 1;
                 }
