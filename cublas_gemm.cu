@@ -340,9 +340,11 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                 int s = 0;
                 for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                     int stage = s % NUM_STAGES_ASYNC_PIPELINE;
+                    int row_off = by*TILE_WIDTH*COARSE_FACTOR_2D + r*TILE_WIDTH + tid;
+                    int col_off = bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH;
                     pipe.producer_acquire();
-                    cuda::memcpy_async(Mds[stage] + tid*TILE_WIDTH, a_fp32 + (by*TILE_WIDTH*COARSE_FACTOR_2D + r*TILE_WIDTH + tid)*k + ph, cuda::aligned_size_t<4>(sizeof(float)*32), pipe);
-                    cuda::memcpy_async(Nds[stage] + tid*TILE_WIDTH, b_fp32 + (ph + tid)*n + bx*TILE_WIDTH*COARSE_FACTOR_2D + c*TILE_WIDTH, cuda::aligned_size_t<4>(sizeof(float)*32), pipe);
+                    cuda::memcpy_async(Mds[stage] + tid*TILE_WIDTH, a_fp32 + row_off*k + ph, cuda::aligned_size_t<4>(sizeof(float)*32), pipe);
+                    cuda::memcpy_async(Nds[stage] + tid*TILE_WIDTH, b_fp32 + (ph + tid)*n + col_off, cuda::aligned_size_t<4>(sizeof(float)*32), pipe);
                     pipe.producer_commit();
                     s += 1;
                 }
@@ -352,22 +354,24 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                 int s = 0;
                 for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                     int stage = s % NUM_STAGES_ASYNC_PIPELINE;
+                    int row_off = ty-4;
                     pipe.consumer_wait();
                     for (int i = 0; i < TILE_WIDTH; i++) {
-                        res[0] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+0];
-                        res[1] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+1];
-                        res[2] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
-                        res[3] += Mds[stage][(ty-4)*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
+                        res[0] += Mds[stage][row_off*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+0];
+                        res[1] += Mds[stage][row_off*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+1];
+                        res[2] += Mds[stage][row_off*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
+                        res[3] += Mds[stage][row_off*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
                     }
                     cooperative_groups::sync(consumer_group);
                     pipe.consumer_release();
                     s += 1;
                 }
 
-                c_fp32[(row - 4)*n+col+0] = alpha * res[0] + beta * c_fp32[(row - 4)*n+col+0];
-                c_fp32[(row - 4)*n+col+1] = alpha * res[1] + beta * c_fp32[(row - 4)*n+col+1];
-                c_fp32[(row - 4)*n+col+2] = alpha * res[2] + beta * c_fp32[(row - 4)*n+col+2];
-                c_fp32[(row - 4)*n+col+3] = alpha * res[3] + beta * c_fp32[(row - 4)*n+col+3];
+                int row_off = row - 4;
+                c_fp32[row_off*n+col+0] = alpha * res[0] + beta * c_fp32[row_off*n+col+0];
+                c_fp32[row_off*n+col+1] = alpha * res[1] + beta * c_fp32[row_off*n+col+1];
+                c_fp32[row_off*n+col+2] = alpha * res[2] + beta * c_fp32[row_off*n+col+2];
+                c_fp32[row_off*n+col+3] = alpha * res[3] + beta * c_fp32[row_off*n+col+3];
             }
         }
     }
@@ -1100,9 +1104,9 @@ void convertFp32ToFp16 (half *out, const float *in, const long n) {
 }
 
 int main(){
-    int m = 2048;
-    int n = 2048;
-    int k = 1024;
+    int m = 4096;
+    int n = 4096;
+    int k = 4096;
 
     float *a_fp32;
     float *b_fp32;
