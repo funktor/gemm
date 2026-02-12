@@ -350,7 +350,6 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                 }
             }
             else {
-                auto consumer_group = cooperative_groups::tiled_partition<32>(block);
                 int s = 0;
                 for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                     int stage = s % NUM_STAGES_ASYNC_PIPELINE;
@@ -362,7 +361,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                         res[2] += Mds[stage][row_off*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+2];
                         res[3] += Mds[stage][row_off*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+3];
                     }
-                    cooperative_groups::sync(consumer_group);
+                    __syncthreads();
                     pipe.consumer_release();
                     s += 1;
                 }
