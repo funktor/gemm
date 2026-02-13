@@ -1013,7 +1013,7 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
                         uint32_t regs_b_1[2];
                         uint32_t regs_b_2[2];
 
-                        int m_row = warp_row_id * 16;
+                        int m_row = (warp_row_id - 1) * 16;
                         int m_col = k2;
 
                         int n_row = k2;
@@ -1098,7 +1098,7 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
             int a_row = (8 * blockIdx.y + i) * 32;
             int b_col = (8 * blockIdx.x + j) * 32;
 
-            int m_row   = warp_row_id * 16;
+            int m_row   = (warp_row_id-1) * 16;
             int n_col_1 = warp_col_id * 16;
             int n_col_2 = n_col_1 + 8;
 
