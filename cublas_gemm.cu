@@ -323,7 +323,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
 
     int row_start = by*TILE_WIDTH*COARSE_FACTOR_2D + ty;
     int col_start = bx*TILE_WIDTH*COARSE_FACTOR_2D + tx*4;
-    int tid = block.thread_rank();
+    int tid = ty * bx + tx;
     int warp_id = tid/32;
 
     for (int r = 0; r < COARSE_FACTOR_2D; r++) {
