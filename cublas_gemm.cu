@@ -977,16 +977,18 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
                 int b_row = s*32;
                 int b_col = (8 * blockIdx.x + j) * 32;
 
-                pipeline.producer_acquire();
-                #pragma unroll
-                for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
-                    int row = j1/32;
-                    int col = j1 % 32;
-                    int s_col = get_swizzled_index(row, col, 32, 2, 8);
-                    cuda::memcpy_async(Mds[s] + row*32 + s_col, a + (a_row + row) * k + (a_col + col), cuda::aligned_size_t<2>(sizeof(half)), pipeline);
-                    cuda::memcpy_async(Nds[s] + row*32 + s_col, b + (b_row + row) * n + (b_col + col), cuda::aligned_size_t<2>(sizeof(half)), pipeline);
+                if (idx < 4) {
+                    pipeline.producer_acquire();
+                    #pragma unroll
+                    for (int j1 = idx; j1 < 32*32; j1 += 4) {
+                        int row = j1/32;
+                        int col = j1 % 32;
+                        int s_col = get_swizzled_index(row, col, 32, 2, 8);
+                        cuda::memcpy_async(Mds[s] + row*32 + s_col, a + (a_row + row) * k + (a_col + col), cuda::aligned_size_t<2>(sizeof(half)), pipeline);
+                        cuda::memcpy_async(Nds[s] + row*32 + s_col, b + (b_row + row) * n + (b_col + col), cuda::aligned_size_t<2>(sizeof(half)), pipeline);
+                    }
+                    pipeline.producer_commit();
                 }
-                pipeline.producer_commit();
             }
 
             int s = NUM_STAGES_ASYNC_PIPELINE;
@@ -1074,10 +1076,10 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
                 pipeline.consumer_release();
                 __syncthreads();
 
-                if (a_col < k) {
+                if (a_col < k && idx < 4) {
                     pipeline.producer_acquire();
                     #pragma unroll
-                    for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
+                    for (int j1 = idx; j1 < 32*32; j1 += 4) {
                         int row = j1/32;
                         int col = j1 % 32;
                         int s_col = get_swizzled_index(row, col, 32, 2, 8);
