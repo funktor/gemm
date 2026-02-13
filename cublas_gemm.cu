@@ -357,7 +357,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                     int row_off = ty-4;
 
                     constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 1;
-                    cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
+                    cuda::pipeline_consumer_wait_prior<pending_batches>(pipe);
 
                     for (int i = 0; i < TILE_WIDTH; i++) {
                         res[0] += Mds[stage][row_off*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+0];
