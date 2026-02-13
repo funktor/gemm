@@ -997,6 +997,12 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
                 cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
                 __syncthreads();
 
+                int a_row = (8 * blockIdx.y + i) * 32;
+                int a_col = k1;
+
+                int b_row = k1;
+                int b_col = (8 * blockIdx.x + j) * 32;
+
                 for (int k2 = 0; k2 < 32; k2 += 16) {
                     uint32_t regs_a[4];
 
