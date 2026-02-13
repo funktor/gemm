@@ -977,10 +977,10 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
                 int b_row = s*32;
                 int b_col = (8 * blockIdx.x + j) * 32;
 
-                if (idx < 4) {
+                if (idx < 32) {
                     pipeline.producer_acquire();
                     #pragma unroll
-                    for (int j1 = idx; j1 < 32*32; j1 += 4) {
+                    for (int j1 = idx; j1 < 32*32; j1 += 32) {
                         int row = j1/32;
                         int col = j1 % 32;
                         int s_col = get_swizzled_index(row, col, 32, 2, 8);
@@ -1076,10 +1076,10 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
                 pipeline.consumer_release();
                 __syncthreads();
 
-                if (a_col < k && idx < 4) {
+                if (a_col < k && idx < 32) {
                     pipeline.producer_acquire();
                     #pragma unroll
-                    for (int j1 = idx; j1 < 32*32; j1 += 4) {
+                    for (int j1 = idx; j1 < 32*32; j1 += 32) {
                         int row = j1/32;
                         int col = j1 % 32;
                         int s_col = get_swizzled_index(row, col, 32, 2, 8);
