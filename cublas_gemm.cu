@@ -977,10 +977,10 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
                 int b_row = s*32;
                 int b_col = (8 * blockIdx.x + j) * 32;
 
-                if (idx < 32) {
+                if (idx < 64) {
                     pipeline.producer_acquire();
                     #pragma unroll
-                    for (int j1 = idx; j1 < 32*32; j1 += 32) {
+                    for (int j1 = idx; j1 < 32*32; j1 += 64) {
                         int row = j1/32;
                         int col = j1 % 32;
                         int s_col = get_swizzled_index(row, col, 32, 2, 8);
@@ -1002,84 +1002,87 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
                 int b_row = s*32;
                 int b_col = (8 * blockIdx.x + j) * 32;
 
-                constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 1;
-                cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
-                __syncthreads();
+                if (idx >= 64) {
+                    constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 1;
+                    cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
+                    __syncthreads();
 
-                for (int k2 = 0; k2 < 32; k2 += 16) {
-                    uint32_t regs_a[4];
+                    for (int k2 = 0; k2 < 32; k2 += 16) {
+                        uint32_t regs_a[4];
 
-                    uint32_t regs_b_1[2];
-                    uint32_t regs_b_2[2];
+                        uint32_t regs_b_1[2];
+                        uint32_t regs_b_2[2];
 
-                    int m_row = warp_row_id * 16;
-                    int m_col = k2;
+                        int m_row = warp_row_id * 16;
+                        int m_col = k2;
 
-                    int n_row = k2;
-                    int n_col_1 = warp_col_id * 16;
-                    int n_col_2 = n_col_1 + 8;
+                        int n_row = k2;
+                        int n_col_1 = warp_col_id * 16;
+                        int n_col_2 = n_col_1 + 8;
 
-                    int x = (thread_id_in_warp/16) * 8 + m_col;
-                    int y = n_col_1;
-                    int z = n_col_2;
+                        int x = (thread_id_in_warp/16) * 8 + m_col;
+                        int y = n_col_1;
+                        int z = n_col_2;
 
-                    x = get_swizzled_index(m_row + thread_id_in_warp % 16, x, 32, 2, 8);
-                    y = get_swizzled_index(n_row + thread_id_in_warp % 16, y, 32, 2, 8);
-                    z = get_swizzled_index(n_row + thread_id_in_warp % 16, z, 32, 2, 8);
+                        x = get_swizzled_index(m_row + thread_id_in_warp % 16, x, 32, 2, 8);
+                        y = get_swizzled_index(n_row + thread_id_in_warp % 16, y, 32, 2, 8);
+                        z = get_swizzled_index(n_row + thread_id_in_warp % 16, z, 32, 2, 8);
 
-                    uint32_t addr_a   = __cvta_generic_to_shared(&Mds[stage][(m_row + thread_id_in_warp % 16) * 32 + x]);
-                    uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[stage][(n_row + thread_id_in_warp % 16) * 32 + y]);
-                    uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[stage][(n_row + thread_id_in_warp % 16) * 32 + z]);
+                        uint32_t addr_a   = __cvta_generic_to_shared(&Mds[stage][(m_row + thread_id_in_warp % 16) * 32 + x]);
+                        uint32_t addr_b_1 = __cvta_generic_to_shared(&Nds[stage][(n_row + thread_id_in_warp % 16) * 32 + y]);
+                        uint32_t addr_b_2 = __cvta_generic_to_shared(&Nds[stage][(n_row + thread_id_in_warp % 16) * 32 + z]);
 
-                    asm volatile(
-                        "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
-                        "{%0, %1, %2, %3}, [%4];"
-                        : "=r"(regs_a[0]), "=r"(regs_a[1]), "=r"(regs_a[2]), "=r"(regs_a[3])
-                        : "r"(addr_a)
-                    );
+                        asm volatile(
+                            "ldmatrix.sync.aligned.m8n8.x4.shared.b16 "
+                            "{%0, %1, %2, %3}, [%4];"
+                            : "=r"(regs_a[0]), "=r"(regs_a[1]), "=r"(regs_a[2]), "=r"(regs_a[3])
+                            : "r"(addr_a)
+                        );
 
-                    asm volatile(
-                        "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
-                        "{%0, %1}, [%2];"
-                        : "=r"(regs_b_1[0]), "=r"(regs_b_1[1])
-                        : "r"(addr_b_1)
-                    );
+                        asm volatile(
+                            "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
+                            "{%0, %1}, [%2];"
+                            : "=r"(regs_b_1[0]), "=r"(regs_b_1[1])
+                            : "r"(addr_b_1)
+                        );
 
-                    asm volatile(
-                        "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
-                        "{%0, %1}, [%2];"
-                        : "=r"(regs_b_2[0]), "=r"(regs_b_2[1])
-                        : "r"(addr_b_2)
-                    );
+                        asm volatile(
+                            "ldmatrix.sync.aligned.m8n8.x2.shared.trans.b16 "
+                            "{%0, %1}, [%2];"
+                            : "=r"(regs_b_2[0]), "=r"(regs_b_2[1])
+                            : "r"(addr_b_2)
+                        );
 
-                    asm volatile(
-                        "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
-                        "{%0, %1, %2, %3}, "
-                        "{%4, %5, %6, %7}, "
-                        "{%8, %9}, "
-                        "{%0, %1, %2, %3};\n"
-                        : "+f"(regs_c_1[0]), "+f"(regs_c_1[1]), "+f"(regs_c_1[2]),"+f"(regs_c_1[3])
-                        : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_1[0]), "r"(regs_b_1[1])
-                    );
+                        asm volatile(
+                            "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+                            "{%0, %1, %2, %3}, "
+                            "{%4, %5, %6, %7}, "
+                            "{%8, %9}, "
+                            "{%0, %1, %2, %3};\n"
+                            : "+f"(regs_c_1[0]), "+f"(regs_c_1[1]), "+f"(regs_c_1[2]),"+f"(regs_c_1[3])
+                            : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_1[0]), "r"(regs_b_1[1])
+                        );
 
-                    asm volatile(
-                        "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
-                        "{%0, %1, %2, %3}, "
-                        "{%4, %5, %6, %7}, "
-                        "{%8, %9}, "
-                        "{%0, %1, %2, %3};\n"
-                        : "+f"(regs_c_2[0]), "+f"(regs_c_2[1]), "+f"(regs_c_2[2]),"+f"(regs_c_2[3])
-                        : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_2[0]), "r"(regs_b_2[1])
-                    );
+                        asm volatile(
+                            "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+                            "{%0, %1, %2, %3}, "
+                            "{%4, %5, %6, %7}, "
+                            "{%8, %9}, "
+                            "{%0, %1, %2, %3};\n"
+                            : "+f"(regs_c_2[0]), "+f"(regs_c_2[1]), "+f"(regs_c_2[2]),"+f"(regs_c_2[3])
+                            : "r"(regs_a[0]), "r"(regs_a[1]), "r"(regs_a[2]), "r"(regs_a[3]), "r"(regs_b_2[0]), "r"(regs_b_2[1])
+                        );
+                    }
+
+                    pipeline.consumer_release();
+                    __syncthreads();
                 }
+                
 
-                pipeline.consumer_release();
-                __syncthreads();
-
-                if (a_col < k && idx < 32) {
+                if (a_col < k && idx < 64) {
                     pipeline.producer_acquire();
                     #pragma unroll
-                    for (int j1 = idx; j1 < 32*32; j1 += 32) {
+                    for (int j1 = idx; j1 < 32*32; j1 += 64) {
                         int row = j1/32;
                         int col = j1 % 32;
                         int s_col = get_swizzled_index(row, col, 32, 2, 8);
@@ -1545,7 +1548,7 @@ int main(){
 
     for (auto i = 0; i < m*n; i++) c_gpu_mma_sync_fp16_2d_tiled_swz_async[i] = 0.0f;
 
-    dim3 bd81(64, 2, 1);
+    dim3 bd81(64, 3, 1);
     dim3 gd81((n+256-1)/256, (m+256-1)/256, 1);
 
     cudaErrCheck(cudaEventRecord(startcublas));
