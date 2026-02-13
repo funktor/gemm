@@ -998,9 +998,9 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
                 __syncthreads();
 
                 int a_row = (8 * blockIdx.y + i) * 32;
-                int a_col = k1;
+                int a_col = s*32;
 
-                int b_row = k1;
+                int b_row = s*32;
                 int b_col = (8 * blockIdx.x + j) * 32;
 
                 for (int k2 = 0; k2 < 32; k2 += 16) {
@@ -1073,17 +1073,14 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
                 pipeline.consumer_release();
                 __syncthreads();
 
-                int a_col_1 = s*32;
-                int b_row_1 = s*32;
-
                 pipeline.producer_acquire();
                 #pragma unroll
                 for (int j1 = idx; j1 < 32*32; j1 += blockDim.x * blockDim.y) {
                     int row = j1/32;
                     int col = j1 % 32;
                     int s_col = get_swizzled_index(row, col, 32, 2, 8);
-                    if ((a_col_1 + col) < k) cuda::memcpy_async(Mds[stage] + row*32 + s_col, a + (a_row + row) * k + (a_col_1 + col), cuda::aligned_size_t<4>(sizeof(half)), pipeline);
-                    if ((b_row_1 + row) < k) cuda::memcpy_async(Nds[stage] + row*32 + s_col, b + (b_row_1 + row) * n + (b_col + col), cuda::aligned_size_t<4>(sizeof(half)), pipeline);
+                    if ((a_col + col) < k) cuda::memcpy_async(Mds[stage] + row*32 + s_col, a + (a_row + row) * k + (a_col + col), cuda::aligned_size_t<4>(sizeof(half)), pipeline);
+                    if ((b_row + row) < k) cuda::memcpy_async(Nds[stage] + row*32 + s_col, b + (b_row + row) * n + (b_col + col), cuda::aligned_size_t<4>(sizeof(half)), pipeline);
                 }
                 pipeline.producer_commit();
 
