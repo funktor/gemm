@@ -237,6 +237,8 @@ void gemm_fp32_cuda_tiled_2D_async(
     const int n, 
     const int k
 ) {
+    cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
+
     __shared__ alignas(16) float Mds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
     __shared__ alignas(16) float Nds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
 
@@ -252,8 +254,6 @@ void gemm_fp32_cuda_tiled_2D_async(
         int row = row_start + r*TILE_WIDTH;
         for (int c = 0; c < COARSE_FACTOR_2D; c++) {
             int col = col_start + c*TILE_WIDTH;
-
-            cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
             
             for (int s = 0; s < NUM_STAGES_ASYNC_PIPELINE; s++) {
                 pipeline.producer_acquire();
@@ -355,7 +355,10 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
                 for (int ph = 0; ph < k; ph += TILE_WIDTH) {
                     int stage = s % NUM_STAGES_ASYNC_PIPELINE;
                     int row_off = ty-4;
-                    pipe.consumer_wait();
+
+                    constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 1;
+                    cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
+
                     for (int i = 0; i < TILE_WIDTH; i++) {
                         res[0] += Mds[stage][row_off*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+0];
                         res[1] += Mds[stage][row_off*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+1];
@@ -1271,9 +1274,9 @@ void convertFp32ToFp16 (half *out, const float *in, const long n) {
 }
 
 int main(){
-    int m = 4096;
-    int n = 4096;
-    int k = 4096;
+    int m = 2048;
+    int n = 2048;
+    int k = 1024;
 
     float *a_fp32;
     float *b_fp32;
