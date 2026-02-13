@@ -953,6 +953,8 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
     const int n, 
     const int k
 ) {
+    cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
+
     __shared__ alignas(16) half Mds[NUM_STAGES_ASYNC_PIPELINE][32*32];
     __shared__ alignas(16) half Nds[NUM_STAGES_ASYNC_PIPELINE][32*32];
 
@@ -967,8 +969,6 @@ void gemm_mma_sync_fp16_2d_tiled_swizzled_async(
 
             float regs_c_1[4] = {0.0f};
             float regs_c_2[4] = {0.0f};
-
-            cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
 
             for (int s = 0; s < NUM_STAGES_ASYNC_PIPELINE; s++) {
                 int a_row = (8 * blockIdx.y + i) * 32;
