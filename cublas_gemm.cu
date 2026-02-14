@@ -237,7 +237,8 @@ void gemm_fp32_cuda_tiled_2D_async(
     const int n, 
     const int k
 ) {
-    cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
+    __shared__ cuda::pipeline_shared_state<scope, NUM_STAGES_ASYNC_PIPELINE> shared_state;
+    cuda::pipeline<cuda::thread_scope_block> pipeline = cuda::make_pipeline(block, &shared_state);
 
     __shared__ alignas(16) float Mds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
     __shared__ alignas(16) float Nds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
@@ -262,15 +263,20 @@ void gemm_fp32_cuda_tiled_2D_async(
                 pipeline.producer_commit();
             }
 
-            int stage = 0;
             int s = NUM_STAGES_ASYNC_PIPELINE;
-
             float res[4] = {0.0f};
 
             for (int ph = 0; ph < k; ph += TILE_WIDTH) {
-                constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 1;
-                cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
-                __syncthreads();
+                int stage = s % NUM_STAGES_ASYNC_PIPELINE;
+
+                if (s*TILE_WIDTH < k) {
+                    pipeline.producer_acquire();
+                    cuda::memcpy_async(Mds[stage] + ty*TILE_WIDTH + tx*4, a_fp32 + row*k + s*TILE_WIDTH + tx*4, cuda::aligned_size_t<4>(sizeof(float)*4), pipeline);
+                    cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH + tx*4, b_fp32 + (s*TILE_WIDTH + ty)*n + col, cuda::aligned_size_t<4>(sizeof(float)*4), pipeline);
+                    pipeline.producer_commit();
+                }
+
+                pipeline.consumer_wait();
 
                 for (int i = 0; i < TILE_WIDTH; i++) {
                     res[0] += Mds[stage][ty*TILE_WIDTH+i]*Nds[stage][i*TILE_WIDTH+tx*4+0];
@@ -280,14 +286,6 @@ void gemm_fp32_cuda_tiled_2D_async(
                 }
 
                 pipeline.consumer_release();
-                __syncthreads();
-
-                pipeline.producer_acquire();
-                if (s*TILE_WIDTH + tx*4 < k) cuda::memcpy_async(Mds[stage] + ty*TILE_WIDTH + tx*4, a_fp32 + row*k + s*TILE_WIDTH + tx*4, cuda::aligned_size_t<4>(sizeof(float)*4), pipeline);
-                if (s*TILE_WIDTH + ty < k)   cuda::memcpy_async(Nds[stage] + ty*TILE_WIDTH + tx*4, b_fp32 + (s*TILE_WIDTH + ty)*n + col, cuda::aligned_size_t<4>(sizeof(float)*4), pipeline);
-                pipeline.producer_commit();
-
-                stage = (stage + 1) % NUM_STAGES_ASYNC_PIPELINE;
                 s += 1;
             }
 
