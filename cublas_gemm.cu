@@ -237,6 +237,7 @@ void gemm_fp32_cuda_tiled_2D_async(
     const int n, 
     const int k
 ) {
+    auto block = cooperative_groups::this_thread_block();
     __shared__ cuda::pipeline_shared_state<scope, NUM_STAGES_ASYNC_PIPELINE> shared_state;
     cuda::pipeline<cuda::thread_scope_block> pipeline = cuda::make_pipeline(block, &shared_state);
 
