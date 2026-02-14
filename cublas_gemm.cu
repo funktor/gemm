@@ -385,7 +385,7 @@ void gemm_fp32_cuda_tiled_2D_async_warp_spl(
 ) {
     auto block = cooperative_groups::this_thread_block();
     __shared__ cuda::pipeline_shared_state<cuda::thread_scope_block, NUM_STAGES_ASYNC_PIPELINE> shared_state;
-    cuda::pipeline<cuda::thread_scope_block> pipe = cuda::make_pipeline(block, &shared_state);
+    cuda::pipeline<cuda::thread_scope_block> pipe = cuda::make_pipeline(block, &shared_state, 32);
 
     __shared__ alignas(16) float Mds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
     __shared__ alignas(16) float Nds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH*TILE_WIDTH];
@@ -1343,9 +1343,9 @@ void convertFp32ToFp16 (half *out, const float *in, const long n) {
 }
 
 int main(){
-    int m = 4096;
-    int n = 4096;
-    int k = 4096;
+    int m = 2048;
+    int n = 2048;
+    int k = 1024;
 
     float *a_fp32;
     float *b_fp32;
