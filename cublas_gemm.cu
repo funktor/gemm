@@ -980,7 +980,7 @@ void gemm_mma_sync_fp16_2d_tiled_b_trans(
                     int col = j1 % 32;
 
                     Mds[row*32 + col] = a[(a_row + row) * k + (a_col + col)];
-                    Nds[row*32 + col] = b[(b_row + row) * k + (b_col + col)];
+                    Nds[col*32 + row] = b[(b_row + row) * k + (b_col + col)];
                 }
 
                 __syncthreads();
