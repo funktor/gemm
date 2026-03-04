@@ -543,7 +543,7 @@ void gemm_fp32_cuda_tiled_2D_vectorize_b_trans(
             for (int c = 0; c < COARSE_FACTOR_2D; c++) {
                 int col = col_start + c*TILE_WIDTH;
 
-                reinterpret_cast<float4 *>(&Nds[ty*TILE_WIDTH + tx*4])[0] = reinterpret_cast<float4 *>(&b_fp32[col*k + ph + tx*4])[0];
+                reinterpret_cast<float4 *>(&Nds[ty*TILE_WIDTH + tx*4])[0] = reinterpret_cast<float4 *>(&b_fp32[col*k + ph + ty])[0];
                 __syncthreads();
 
                 for (int i = 0; i < TILE_WIDTH; i++) {
