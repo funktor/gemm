@@ -1,12 +1,42 @@
 #ifndef CUDA_GEMM_H
 #define CUDA_GEMM_H
 
+#include <Python.h>
+#include <torch/extension.h>
+#include <tbb/tbb.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <iostream>
-#include <math.h>
-#include <assert.h>
-#include <chrono>
+#include <vector>
+#include <algorithm>
+#include <array>
+#include <map>
+#include <set>
+#include <unordered_map>
+#include <unordered_set>
+#include <deque>
+#include <tuple>
+#include <map>
+#include <fcntl.h>
+#include <functional>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <cstring>
+#include <string>
 #include <random>
+#include <algorithm>
+#include <chrono>
+#include <mutex>
+#include <thread>
+#include <ctime> 
+#include <stdbool.h>    // bool type
+#include <fstream>
+#include <cmath>
+#include <variant>
+#include <assert.h>
+#include <initializer_list>
+
 #include <omp.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
