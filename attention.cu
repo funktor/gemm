@@ -93,8 +93,8 @@ bool compare_matrices(const float *x, const float *y, const long n) {
 
 __global__
 void gemm_fp32_cuda_tiled_2D_vectorize(
-    const float *a_fp32, 
-    const float *b_fp32, 
+    float *a_fp32, 
+    float *b_fp32, 
     float *c_fp32, 
     const float alpha, 
     const float beta, 
@@ -153,8 +153,8 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
 
 __global__
 void gemm_fp32_cuda_tiled_2D_vectorize_b_trans(
-    const float *a_fp32, 
-    const float *b_fp32, 
+    float *a_fp32, 
+    float *b_fp32, 
     float *c_fp32, 
     float *c_max_row,
     float *c_sum_row,
@@ -297,9 +297,9 @@ void gemm_fp32_cuda_tiled_2D_vectorize_b_trans(
 }
 
 void attention_gpu(
-    const float *q_fp32, 
-    const float *k_fp32, 
-    const float *v_fp32, 
+    float *q_fp32, 
+    float *k_fp32, 
+    float *v_fp32, 
     float *out, 
     const int m, 
     const int k
