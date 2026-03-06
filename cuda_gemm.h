@@ -99,9 +99,36 @@ void gemm_cpu(
     float *c, 
     const float alpha,
     const float beta,
-    const int m, 
-    const int n, 
-    const int k
+    const unsigned int m, 
+    const unsigned int n, 
+    const unsigned int k
+);
+
+void gemm_cpu_b_trans(
+    const float *a, 
+    const float *b, 
+    float *c, 
+    const float alpha,
+    const float beta,
+    const unsigned int m, 
+    const unsigned int n, 
+    const unsigned int k
+);
+
+void softmax(
+    const float *inp, 
+    float *out, 
+    const unsigned int n, 
+    const unsigned int m
+);
+
+void attention_cpu(
+    const float *q, 
+    const float *k, 
+    const float *v, 
+    float *out, 
+    const unsigned int m, 
+    const unsigned int n
 );
 
 void gemm_fp16_cublas(
