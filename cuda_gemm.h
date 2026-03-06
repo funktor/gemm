@@ -1,8 +1,6 @@
 #ifndef CUDA_GEMM_H
 #define CUDA_GEMM_H
 
-#include <Python.h>
-#include <torch/extension.h>
 #include <tbb/tbb.h>
 #include <unistd.h>
 #include <stdio.h>
