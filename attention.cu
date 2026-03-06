@@ -341,7 +341,7 @@ int main(){
     float *v_fp32;
     float *k_fp32_t;
 
-    cudaErrCheck(cudaMallocManaged(&a_fp32, m * k * sizeof(float)));
+    cudaErrCheck(cudaMallocManaged(&q_fp32, m * k * sizeof(float)));
     cudaErrCheck(cudaMallocManaged(&k_fp32, m * k * sizeof(float)));
     cudaErrCheck(cudaMallocManaged(&v_fp32, m * k * sizeof(float)));
     cudaErrCheck(cudaMallocManaged(&k_fp32_t, k * m * sizeof(float)));
