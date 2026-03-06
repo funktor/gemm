@@ -394,7 +394,6 @@ int main(){
     cudaErrCheck(cudaFree(v_fp32));
     cudaErrCheck(cudaFree(k_fp32_t));
     cudaErrCheck(cudaFree(c_cpu_fp32));
-    cudaErrCheck(cudaFree(c_gpu_fp32));
     cudaErrCheck(cudaDeviceReset());
     return 0;
 }
