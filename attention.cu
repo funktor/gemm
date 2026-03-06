@@ -64,14 +64,6 @@ void convertFp32ToFp16 (half *out, const float *in, const long n) {
     }
 }
 
-__global__ 
-void normalize_fp32(const float *in, const float *in, const long n, const int d) {
-    long idx = blockDim.x * blockIdx.x + threadIdx.x;
-    if (idx < n) {
-        out[idx] = in[idx]/float(d);
-    }
-}
-
 __device__ __forceinline__ float atomicMaxF32(float *address, float val) {
     int ret = __float_as_int(*address);
     while(val > __int_as_float(ret))
@@ -101,8 +93,8 @@ bool compare_matrices(const float *x, const float *y, const long n) {
 
 __global__
 void gemm_fp32_cuda_tiled_2D_vectorize(
-    float *a_fp32, 
-    float *b_fp32, 
+    const float *a_fp32, 
+    const float *b_fp32, 
     float *c_fp32, 
     const float alpha, 
     const float beta, 
@@ -161,8 +153,8 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
 
 __global__
 void gemm_fp32_cuda_tiled_2D_vectorize_b_trans(
-    float *a_fp32, 
-    float *b_fp32, 
+    const float *a_fp32, 
+    const float *b_fp32, 
     float *c_fp32, 
     float *c_max_row,
     float *c_sum_row,
@@ -174,8 +166,8 @@ void gemm_fp32_cuda_tiled_2D_vectorize_b_trans(
 ) {
     __shared__ float Mds[TILE_WIDTH*TILE_WIDTH];
     __shared__ float Nds[TILE_WIDTH*TILE_WIDTH];
-    __shared__ float block_max_values[blockDim.x];
-    __shared__ float block_sum_values[blockDim.x];
+    __shared__ float block_max_values[8];
+    __shared__ float block_sum_values[8];
 
     int bx = blockIdx.x;
     int by = blockIdx.y;
@@ -327,7 +319,7 @@ void attention_gpu(
     for (auto i = 0; i < m; i++) c_sum_row[i] = 0.0f;
 
     dim3 bd1(8, 32, 1);
-    dim3 gd1((n+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
+    dim3 gd1((m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
 
     gemm_fp32_cuda_tiled_2D_vectorize_b_trans<<<gd1, bd1>>>(q_fp32, k_fp32, qk_t, c_max_row, c_sum_row, 1.0/float(k), 0.0, m, m, k);
     cudaDeviceSynchronize();
