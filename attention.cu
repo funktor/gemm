@@ -324,7 +324,7 @@ void attention_gpu(
     gemm_fp32_cuda_tiled_2D_vectorize_b_trans<<<gd1, bd1>>>(q_fp32, k_fp32, qk_t, c_max_row, c_sum_row, 1.0/float(k), 0.0, m, m, k);
     cudaDeviceSynchronize();
 
-    gemm_fp32_cuda_tiled_2D_vectorize<<<gd1, bd1>>>(qk_t, v_fp32, out, 1.0, 0.0, m, m, k);
+    gemm_fp32_cuda_tiled_2D_vectorize<<<gd1, bd1>>>(qk_t, v_fp32, out, 1.0, 0.0, m, k, m);
     cudaDeviceSynchronize();
 
     cudaErrCheck(cudaFree(qk_t));
