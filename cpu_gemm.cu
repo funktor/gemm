@@ -1,6 +1,13 @@
 #include "cuda_gemm.h"
 using namespace std;
 
+void print_arr2(const float *x, const long n) {
+    for (auto i = 0; i < n; i++) {
+        printf("%f, ", x[i]);
+    }
+    printf("\n");
+}
+
 void gemm_cpu(
     const float *a, 
     const float *b, 
