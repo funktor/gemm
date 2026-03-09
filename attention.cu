@@ -9,6 +9,7 @@ using namespace nvcuda;
 #define WMMA_N 16
 #define WMMA_K 16
 #define NUM_STAGES_ASYNC_PIPELINE 4
+#define MAX_NUM_TILES 128
 
 
 // Define some error checking macros.
@@ -111,13 +112,13 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
     int row_start = by*TILE_WIDTH*COARSE_FACTOR_2D + ty;
     int col_start = bx*TILE_WIDTH*COARSE_FACTOR_2D + tx*4;
 
-    float Pval[COARSE_FACTOR_2D*COARSE_FACTOR_2D*32*4];
-    for (int r = 0; r < COARSE_FACTOR_2D*COARSE_FACTOR_2D*32*4; r++) Pval[r] = 0.0f;
+    int num_tiles = (k + TILE_WIDTH - 1)/TILE_WIDTH;
 
-    int num_tiles = 32;
+    float Pval[COARSE_FACTOR_2D*COARSE_FACTOR_2D*MAX_NUM_TILES*4];
+    for (int r = 0; r < COARSE_FACTOR_2D*COARSE_FACTOR_2D*num_tiles*4; r++) Pval[r] = 0.0f;
 
-    float max_val_tiles[32*COARSE_FACTOR_2D];
-    float sum_val_tiles[32*COARSE_FACTOR_2D];
+    float max_val_tiles[MAX_NUM_TILES*COARSE_FACTOR_2D];
+    float sum_val_tiles[MAX_NUM_TILES*COARSE_FACTOR_2D];
 
     int h = 0;
 
@@ -132,8 +133,8 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
             for (int i = 0; i < TILE_WIDTH; i++) max_val_tile = max(max_val_tile, Mds[ty*TILE_WIDTH+i]);
             for (int i = 0; i < TILE_WIDTH; i++) sum_val_tile += exp(Mds[ty*TILE_WIDTH+i]-max_val_tile);
 
-            max_val_tiles[r*32 + h] = max_val_tile;
-            sum_val_tiles[r*32 + h] = sum_val_tile;
+            max_val_tiles[r*MAX_NUM_TILES + h] = max_val_tile;
+            sum_val_tiles[r*MAX_NUM_TILES + h] = sum_val_tile;
 
             for (int c = 0; c < COARSE_FACTOR_2D; c++) {
                 int col = col_start + c*TILE_WIDTH;
@@ -141,10 +142,10 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
                 __syncthreads();
 
                 for (int i = 0; i < TILE_WIDTH; i++) {
-                    Pval[4*(r*COARSE_FACTOR_2D*32 + 32*c + h) + 0] += exp(Mds[ty*TILE_WIDTH+i]-max_val_tile)*Nds[i*TILE_WIDTH+tx*4+0];
-                    Pval[4*(r*COARSE_FACTOR_2D*32 + 32*c + h) + 1] += exp(Mds[ty*TILE_WIDTH+i]-max_val_tile)*Nds[i*TILE_WIDTH+tx*4+1];
-                    Pval[4*(r*COARSE_FACTOR_2D*32 + 32*c + h) + 2] += exp(Mds[ty*TILE_WIDTH+i]-max_val_tile)*Nds[i*TILE_WIDTH+tx*4+2];
-                    Pval[4*(r*COARSE_FACTOR_2D*32 + 32*c + h) + 3] += exp(Mds[ty*TILE_WIDTH+i]-max_val_tile)*Nds[i*TILE_WIDTH+tx*4+3];
+                    Pval[4*(r*COARSE_FACTOR_2D*MAX_NUM_TILES + MAX_NUM_TILES*c + h) + 0] += exp(Mds[ty*TILE_WIDTH+i]-max_val_tile)*Nds[i*TILE_WIDTH+tx*4+0];
+                    Pval[4*(r*COARSE_FACTOR_2D*MAX_NUM_TILES + MAX_NUM_TILES*c + h) + 1] += exp(Mds[ty*TILE_WIDTH+i]-max_val_tile)*Nds[i*TILE_WIDTH+tx*4+1];
+                    Pval[4*(r*COARSE_FACTOR_2D*MAX_NUM_TILES + MAX_NUM_TILES*c + h) + 2] += exp(Mds[ty*TILE_WIDTH+i]-max_val_tile)*Nds[i*TILE_WIDTH+tx*4+2];
+                    Pval[4*(r*COARSE_FACTOR_2D*MAX_NUM_TILES + MAX_NUM_TILES*c + h) + 3] += exp(Mds[ty*TILE_WIDTH+i]-max_val_tile)*Nds[i*TILE_WIDTH+tx*4+3];
                 }
                 __syncthreads();
             }
@@ -157,19 +158,19 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
         int row = row_start + r*TILE_WIDTH;
 
         float max_val = -MAXFLOAT;
-        for (int h = 0; h < num_tiles; h++) max_val = max(max_val, max_val_tiles[r*32 + h]);
+        for (int h = 0; h < num_tiles; h++) max_val = max(max_val, max_val_tiles[r*MAX_NUM_TILES + h]);
 
         float sum_val = 0.0f;
-        for (int h = 0; h < num_tiles; h++) sum_val += sum_val_tiles[r*32 + h] * exp(max_val_tiles[r*32 + h]-max_val);
+        for (int h = 0; h < num_tiles; h++) sum_val += sum_val_tiles[r*MAX_NUM_TILES + h] * exp(max_val_tiles[r*MAX_NUM_TILES + h]-max_val);
 
         for (int c = 0; c < COARSE_FACTOR_2D; c++) {
             int col = col_start + c*TILE_WIDTH;
 
             for (int h = 0; h < num_tiles; h++) {
-                c_fp32[row*n + col + 0] += Pval[4*(r*COARSE_FACTOR_2D*32 + 32*c + h) + 0] * exp(max_val_tiles[r*32 + h]-max_val)/sum_val;
-                c_fp32[row*n + col + 1] += Pval[4*(r*COARSE_FACTOR_2D*32 + 32*c + h) + 1] * exp(max_val_tiles[r*32 + h]-max_val)/sum_val;
-                c_fp32[row*n + col + 2] += Pval[4*(r*COARSE_FACTOR_2D*32 + 32*c + h) + 2] * exp(max_val_tiles[r*32 + h]-max_val)/sum_val;
-                c_fp32[row*n + col + 3] += Pval[4*(r*COARSE_FACTOR_2D*32 + 32*c + h) + 3] * exp(max_val_tiles[r*32 + h]-max_val)/sum_val;
+                c_fp32[row*n + col + 0] += Pval[4*(r*COARSE_FACTOR_2D*MAX_NUM_TILES + MAX_NUM_TILES*c + h) + 0] * exp(max_val_tiles[r*MAX_NUM_TILES + h]-max_val)/sum_val;
+                c_fp32[row*n + col + 1] += Pval[4*(r*COARSE_FACTOR_2D*MAX_NUM_TILES + MAX_NUM_TILES*c + h) + 1] * exp(max_val_tiles[r*MAX_NUM_TILES + h]-max_val)/sum_val;
+                c_fp32[row*n + col + 2] += Pval[4*(r*COARSE_FACTOR_2D*MAX_NUM_TILES + MAX_NUM_TILES*c + h) + 2] * exp(max_val_tiles[r*MAX_NUM_TILES + h]-max_val)/sum_val;
+                c_fp32[row*n + col + 3] += Pval[4*(r*COARSE_FACTOR_2D*MAX_NUM_TILES + MAX_NUM_TILES*c + h) + 3] * exp(max_val_tiles[r*MAX_NUM_TILES + h]-max_val)/sum_val;
             }
         }
     }
@@ -183,12 +184,13 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
     //     for (int c = 0; c < COARSE_FACTOR_2D; c++) {
     //         int col = col_start + c*TILE_WIDTH;
 
-    //         int num_tiles = 32;
+    //         int num_tiles = (k + TILE_WIDTH - 1)/TILE_WIDTH;
 
-    //         float max_val_tiles[32];
-    //         float sum_val_tiles[32];
-    //         float pval_tiles[4*32];
-    //         for (int j = 0; j < 4*32; j++) pval_tiles[j] = 0.0f;
+    //         float max_val_tiles[MAX_NUM_TILES];
+    //         float sum_val_tiles[MAX_NUM_TILES];
+    //         float pval_tiles[4*MAX_NUM_TILES];
+
+    //         for (int j = 0; j < 4*num_tiles; j++) pval_tiles[j] = 0.0f;
             
     //         float max_val = -MAXFLOAT;
 
@@ -376,15 +378,18 @@ void attention_gpu(
     gemm_fp32_cuda_tiled_2D_vectorize_b_trans<<<gd1, bd1>>>(q_fp32, k_fp32, qk_t, 1.0/sqrt(k), m, m, k);
     cudaDeviceSynchronize();
 
-    gemm_fp32_cuda_tiled_2D_vectorize<<<gd1, bd1>>>(qk_t, v_fp32, out, m, k, m);
+    dim3 bd2(8, 32, 1);
+    dim3 gd2((k+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), (m+32*COARSE_FACTOR_2D-1)/(32*COARSE_FACTOR_2D), 1);
+
+    gemm_fp32_cuda_tiled_2D_vectorize<<<gd2, bd2>>>(qk_t, v_fp32, out, m, k, m);
     cudaDeviceSynchronize();
 
     cudaErrCheck(cudaFree(qk_t));
 }
 
 int main(){
-    int m = 1024;
-    int k = 1024;
+    int m = 4096;
+    int k = 128;
 
     float *q_fp32;
     float *k_fp32;
