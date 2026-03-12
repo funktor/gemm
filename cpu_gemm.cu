@@ -1,13 +1,6 @@
 #include "cuda_gemm.h"
 using namespace std;
 
-void print_arr2(const float *x, const long n) {
-    for (auto i = 0; i < n; i++) {
-        printf("%f, ", x[i]);
-    }
-    printf("\n");
-}
-
 void gemm_cpu(
     const float *a, 
     const float *b, 
@@ -17,8 +10,7 @@ void gemm_cpu(
     const unsigned int m, 
     const unsigned int n, 
     const unsigned int k
-) 
-{
+) {
     omp_set_num_threads(8);
     #pragma omp parallel for shared(a, b, c)
     for(auto i = 0; i < m; i++) {
@@ -39,8 +31,7 @@ void gemm_cpu_b_trans(
     const unsigned int m, 
     const unsigned int n, 
     const unsigned int k
-) 
-{
+) {
     omp_set_num_threads(8);
     #pragma omp parallel for shared(a, b, c)
     for(auto i = 0; i < m; i++) {
@@ -57,8 +48,7 @@ void softmax(
     float *out, 
     const unsigned int n, 
     const unsigned int m
-) 
-{
+) {
 
     float *max_per_row = new float[n];
     float *sum_per_row = new float[n];
@@ -110,8 +100,7 @@ void attention_cpu(
     float *out, 
     const unsigned int m, 
     const unsigned int n
-) 
-{
+) {
     float *qk_t = new float[m*m];
     gemm_cpu_b_trans(q, k, qk_t, 1.0, 0.0, m, m, n);
 

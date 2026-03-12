@@ -9,4 +9,6 @@ nvcc cpu_gemm.cu cublas_gemm.cu -Xcompiler -fopenmp -o my_gemm -O3 -Xcompiler -O
 
 nvcc cpu_gemm.cu attention.cu -Xcompiler -fopenmp -o fattention -O3 -Xcompiler -O3 --gpu-code=sm_89 -arch=compute_89 -lcublas -lcurand -ltbb
 
+nvcc -rdc=true *.cu -Xcompiler -fopenmp -o my_gemm -O3 -Xcompiler -O3 --gpu-code=sm_89 -arch=compute_89 -lcublas -lcurand -ltbb
+
 ```
