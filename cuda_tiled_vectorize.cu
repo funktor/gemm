@@ -12,8 +12,8 @@ void gemm_fp32_cuda_tiled_2D_vectorize(
     const int n, 
     const int k
 ) {
-    __shared__ float Mds[TILE_WIDTH*TILE_WIDTH];
-    __shared__ float Nds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ alignas(16) float Mds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ alignas(16) float Nds[TILE_WIDTH*TILE_WIDTH];
 
     int bx = blockIdx.x;
     int by = blockIdx.y;
@@ -72,8 +72,8 @@ void gemm_fp32_cuda_tiled_2D_vectorize_b_trans(
     const int n, 
     const int k
 ) {
-    __shared__ float Mds[TILE_WIDTH*TILE_WIDTH];
-    __shared__ float Nds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ alignas(16) float Mds[TILE_WIDTH*TILE_WIDTH];
+    __shared__ alignas(16) float Nds[TILE_WIDTH*TILE_WIDTH];
 
     int bx = blockIdx.x;
     int by = blockIdx.y;
