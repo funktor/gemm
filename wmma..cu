@@ -65,15 +65,18 @@ void gemm_wmma_shmm(
     const int n, 
     const int k
 ) {
-    __shared__ half Mds[TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
-    __shared__ half Nds[TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
+    cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
 
-    int lda = k;
-    int ldb = n;
+    __shared__ half Mds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
+    __shared__ half Nds[NUM_STAGES_ASYNC_PIPELINE][TILE_WIDTH_WMMA*TILE_WIDTH_WMMA];
+
     int ldc = n;
 
     int warpM = (blockIdx.y * blockDim.y + threadIdx.y);
     int warpN = (blockIdx.x * blockDim.x + threadIdx.x) / 32;
+
+    int bx = blockIdx.x;
+    int by = blockIdx.y;
 
     wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> a_frag;
     wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> b_frag;
@@ -84,21 +87,28 @@ void gemm_wmma_shmm(
 
     int idx = threadIdx.y * blockDim.x + threadIdx.x;
 
+    int a_block_row = by * TILE_WIDTH_WMMA;
+    int b_block_col = bx * TILE_WIDTH_WMMA;
+
+    for (int s = 0; s < NUM_STAGES_ASYNC_PIPELINE; s++) {
+        int h = s*TILE_WIDTH_WMMA;
+
+        pipeline.producer_acquire();
+        #pragma unroll
+        for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
+            cuda::memcpy_async(Mds[s] + j, a + (a_block_row + j/TILE_WIDTH_WMMA)*k + h + (j % TILE_WIDTH_WMMA), cuda::aligned_size_t<2>(sizeof(half)), pipeline);
+            cuda::memcpy_async(Nds[s] + j, b + (h + j/TILE_WIDTH_WMMA)*n + b_block_col + (j % TILE_WIDTH_WMMA), cuda::aligned_size_t<2>(sizeof(half)), pipeline);
+        }
+        pipeline.producer_commit();
+    }
+
+    int s = NUM_STAGES_ASYNC_PIPELINE;
+
     for (int i = 0; i < k; i += TILE_WIDTH_WMMA) {
-        int a_block_row = blockIdx.y * TILE_WIDTH_WMMA;
-        int a_block_col = i;
+        int stage = s % NUM_STAGES_ASYNC_PIPELINE;
 
-        for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
-            Mds[j] = a[(a_block_row + j/TILE_WIDTH_WMMA) * k + a_block_col + (j % TILE_WIDTH_WMMA)];
-        }
-
-        int b_block_row = i;
-        int b_block_col = blockIdx.x * TILE_WIDTH_WMMA;
-
-        for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
-            Nds[j] = b[(b_block_row + j/TILE_WIDTH_WMMA) * n + b_block_col + (j % TILE_WIDTH_WMMA)];
-        }
-
+        constexpr size_t pending_batches = NUM_STAGES_ASYNC_PIPELINE - 1;
+        cuda::pipeline_consumer_wait_prior<pending_batches>(pipeline);
         __syncthreads();
 
         #pragma unroll
@@ -110,13 +120,27 @@ void gemm_wmma_shmm(
             int b_warp_col = (threadIdx.x / 32) * WMMA_N;
 
             if (a_warp_row < TILE_WIDTH_WMMA && a_warp_col < TILE_WIDTH_WMMA && b_warp_row < TILE_WIDTH_WMMA && b_warp_col < TILE_WIDTH_WMMA) {
-                wmma::load_matrix_sync(a_frag, Mds + a_warp_row * TILE_WIDTH_WMMA + a_warp_col, TILE_WIDTH_WMMA);
-                wmma::load_matrix_sync(b_frag, Nds + b_warp_row * TILE_WIDTH_WMMA + b_warp_col, TILE_WIDTH_WMMA);
+                wmma::load_matrix_sync(a_frag, Mds[stage] + a_warp_row * TILE_WIDTH_WMMA + a_warp_col, TILE_WIDTH_WMMA);
+                wmma::load_matrix_sync(b_frag, Nds[stage] + b_warp_row * TILE_WIDTH_WMMA + b_warp_col, TILE_WIDTH_WMMA);
                 wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
             }
         }
 
+        pipeline.consumer_release();
         __syncthreads();
+
+        pipeline.producer_acquire();
+        int h = s*TILE_WIDTH_WMMA;
+        if (h < k) {
+            #pragma unroll
+            for (int j = idx; j < TILE_WIDTH_WMMA*TILE_WIDTH_WMMA; j += blockDim.x * blockDim.y) {
+                cuda::memcpy_async(Mds[stage] + j, a + (a_block_row + j/TILE_WIDTH_WMMA)*k + h + (j % TILE_WIDTH_WMMA), cuda::aligned_size_t<2>(sizeof(half)), pipeline);
+                cuda::memcpy_async(Nds[stage] + j, b + (h + j/TILE_WIDTH_WMMA)*n + b_block_col + (j % TILE_WIDTH_WMMA), cuda::aligned_size_t<2>(sizeof(half)), pipeline);
+            }
+        }
+        pipeline.producer_commit();
+
+        s += 1;
     }
 
     int cRow = warpM * WMMA_M;
